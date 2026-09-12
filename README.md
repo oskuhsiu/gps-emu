@@ -15,7 +15,7 @@ An Android 15+ mock-location prototype with fixed positions, walking routes, adj
 
 The initial specification is already implemented as version 0.1.0. The issue preserves the specification and remaining verification work; it does not mean implementation should start over.
 
-Git tracks implementation/design documents, research conclusions, security evidence and compact verification summaries so they stay with the code they describe. The duplicate local issue specification, interview drafts, raw emulator logs/screenshots, local agent handoff files, build outputs and signing credentials are excluded by [.gitignore](.gitignore). GitHub Issues remains the source of requirements and task status; it does not replace these implementation and verification records.
+Git tracks implementation/design documents, research conclusions, security evidence and compact verification summaries so they stay with the code they describe. The duplicate local issue specification, interview drafts, raw emulator logs/screenshots, local agent handoff files, build outputs and private signing credentials are excluded by [.gitignore](.gitignore). The one intentionally [public test keystore](signing/README.md) is an explicit exception. GitHub Issues remains the source of requirements and task status; it does not replace these implementation and verification records.
 
 ## Build
 
@@ -46,42 +46,20 @@ The wrapper pins Gradle 8.13 and verifies the distribution SHA-256. SDK and depe
 
 [The release workflow](.github/workflows/release.yml) runs on tag pushes. Use stable version tags such as `v0.1.0` or `0.1.0`; other formats fail validation. The tag supplies `versionName`, and `versionCode` is `major * 1000000 + minor * 1000 + patch + 1`. Major is limited to 2099, minor/patch to 999, with no leading zeros. Publish increasing versions so Android can update existing installations.
 
-Configure these repository **Actions secrets** once in [GitHub settings](https://github.com/oskuhsiu/gps-emu/settings/secrets/actions):
+No signing Secrets need to be configured. At the owner's request, the workflow uses the committed [public test keystore](signing/README.md) and verifies its SHA-256 before building. This fixed key is reused across versions; it is not regenerated per run.
 
-| Secret | Value |
-| --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | Base64-encoded contents of the release keystore |
-| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
-| `ANDROID_KEY_ALIAS` | Alias of the signing key in the keystore |
-| `ANDROID_KEY_PASSWORD` | Password of that private-key entry |
+**This is a public test signing identity.** Anyone can sign an APK with this key, so matching its certificate does not prove publisher authenticity. Release titles and notes disclose this limitation. Download APKs from this repository's Releases page. Use a separate private identity for future production distribution.
 
-Reuse and back up the same release key for future updates. The workflow does not create a new signing identity per run or fall back to a debug key. If no release key exists yet, generate one once outside the repository, for example with the JDK's interactive tool:
-
-```bash
-keytool -genkeypair -storetype JKS -keystore /secure/path/route-mock-release.jks \
-  -alias route-mock -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=Route Mock'
-```
-
-With an authenticated local GitHub CLI, the encoded keystore can be uploaded without printing it to the terminal:
-
-```bash
-openssl base64 -A -in /secure/path/route-mock-release.jks | \
-  gh secret set ANDROID_KEYSTORE_BASE64 --repo oskuhsiu/gps-emu
-gh secret set ANDROID_KEYSTORE_PASSWORD --repo oskuhsiu/gps-emu
-gh secret set ANDROID_KEY_ALIAS --repo oskuhsiu/gps-emu
-gh secret set ANDROID_KEY_PASSWORD --repo oskuhsiu/gps-emu
-```
-
-First commit and push the complete project, including the workflow. Then push a tag pointing to that source commit:
+Pushing `main` alone does not run this workflow. First push the complete project, then push a new version tag pointing to that source commit:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow runs core tests and release lint, builds the product release variant, aligns and signs the APK, and verifies its signature before transferring it to a separate publishing job. Only that publishing job has repository write permission. It verifies the tag still points to the built commit, uploads `route-mock-0.1.0-release.apk` and `SHA256SUMS.txt` to a draft, then publishes the GitHub Release with generated notes. A failed upload leaves a draft that a rerun can resume; an already published release is not overwritten. Missing signing secrets fail before the build.
+The workflow runs core tests and release lint, builds the product release variant, aligns and signs the APK, and verifies its signature before transferring it to a separate publishing job. Only that publishing job has repository write permission. It verifies the tag still points to the built commit, uploads `route-mock-0.1.0-release.apk` and `SHA256SUMS.txt` to a draft, then publishes the GitHub Release with generated notes and the public-key notice. A failed upload leaves a draft that a rerun can resume; an already published release is not overwritten. Missing or changed keystore bytes fail before the build.
 
-The release contains the product APK, not the test receiver. These APKs use the configured release certificate; an existing debug-signed installation generally needs to be uninstalled first because its certificate differs. No Google Play deployment is performed.
+The release contains the product APK, not the test receiver. These APKs use the persistent public test certificate; an existing debug-signed installation generally needs to be uninstalled first because its certificate differs. No Google Play deployment is performed.
 
 For a local unsigned release build with the same version mapping, use:
 
@@ -90,7 +68,7 @@ For a local unsigned release build with the same version mapping, use:
   -PreleaseVersionName=0.1.0 -PreleaseVersionCode=1001
 ```
 
-The unsigned output requires signing before installation. References: [GitHub Actions secrets](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets), [Android versioning](https://developer.android.com/studio/publish/versioning), [APK signing](https://developer.android.com/tools/apksigner).
+The unsigned output requires signing before installation. References: [Android versioning](https://developer.android.com/studio/publish/versioning), [APK signing](https://developer.android.com/tools/apksigner).
 
 ## Use
 

@@ -50,27 +50,15 @@ jobs:
           printf 'version_name=%s.%s.%s\nversion_code=%s\ncommit_sha=%s\n' \
             "$major" "$minor" "$patch" "$version_code" "$commit_sha" >> "$GITHUB_OUTPUT"
 
-      - name: Check signing secrets
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            if [[ -z "${!name}" ]]; then
-              echo "::error::Missing repository secret: $name"
-              exit 1
-            fi
-          done
-
       - name: Set up Java
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
+      - name: Verify public test keystore
+        run: sha256sum --check signing/public-test.jks.sha256
 
       - name: Install Android build packages
         run: |
@@ -90,25 +78,20 @@ jobs:
       - name: Align, sign, and verify APK
         env:
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Intentionally public test credentials; see signing/README.md.
+          PUBLIC_TEST_PASSWORD: public-test-password
         run: |
           set -euo pipefail
           umask 077
-          keystore=$(mktemp "$RUNNER_TEMP/routemock-keystore.XXXXXX")
-          trap 'rm -f "$keystore"' EXIT
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
           build_tools="$ANDROID_HOME/build-tools/35.0.0"
           mkdir -p release-assets
           "$build_tools/zipalign" -P 16 -f 4 \
             app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
           apk="release-assets/route-mock-${VERSION_NAME}-release.apk"
-          "$build_tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
-            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+          "$build_tools/apksigner" sign --ks signing/public-test.jks --ks-key-alias route-mock-public-test \
+            --ks-pass env:PUBLIC_TEST_PASSWORD --key-pass env:PUBLIC_TEST_PASSWORD \
             --v4-signing-enabled false --out "$apk" "$RUNNER_TEMP/aligned.apk"
-          "$build_tools/apksigner" verify --verbose "$apk"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk"
           "$build_tools/zipalign" -c -P 16 4 "$apk"
           (cd release-assets && sha256sum ./*.apk > SHA256SUMS.txt)
 
@@ -156,9 +139,16 @@ jobs:
               exit 1
             fi
           else
+            cat > "$RUNNER_TEMP/public-signing-notice.md" <<'NOTICE'
+          **Public test signing key:** this release APK uses a keystore and password
+          intentionally published in this repository. Anyone can sign an APK with
+          the same identity, so its certificate does not prove publisher authenticity.
+          Download the APK from this repository's Releases page. The key is reused
+          across versions for test-installation updates; it is not a production key.
+          NOTICE
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --verify-tag --target "$BUILD_COMMIT" --title "Route Mock $VERSION_NAME" \
-              --generate-notes --draft
+              --verify-tag --target "$BUILD_COMMIT" --title "Route Mock $VERSION_NAME (public test key)" \
+              --generate-notes --notes-file "$RUNNER_TEMP/public-signing-notice.md" --draft
           fi
           gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
             "route-mock-${VERSION_NAME}-release.apk" SHA256SUMS.txt --clobber

@@ -28,6 +28,8 @@ local.properties
 keystore.properties
 signing.properties
 *.jks
+# The owner explicitly requested this one public test signing identity.
+!/signing/public-test.jks
 *.keystore
 *.p12
 *.pfx

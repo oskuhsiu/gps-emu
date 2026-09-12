@@ -81,3 +81,7 @@ WebView bridge 的檢查依據包含 [Android 官方安全說明](https://develo
 - debug APK 可除錯，是開發產物；release unsigned APK 的 manifest 沒有 debuggable=true，但尚未成為正式簽章交付物。不能以其中一份的結果概括未來不同雜湊的 APK。
 
 本次沒有取得需要立即移除或隔離某個第三方套件的證據；後續若有套件／版本／來源異動，應重新執行上述查核。
+
+## 後續簽章政策異動
+
+本報告以上內容記錄安全檢查當時的版本。使用者之後明確要求公開 keystore，發布流程改為使用固定、隨版本庫公開的測試私鑰與密碼，取消四個 signing Secrets 的前置要求；詳見[簽章身分與限制](../../../signing/README.md)。這項改動不屬於上面的 runtime 依賴檢查結果，且公開測試 keystore 所簽 APK 的憑證無法證明發布者身分。原有對私密簽章流程的描述，不應解讀為後續公開測試版仍有相同的身分保護。
