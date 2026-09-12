@@ -1,0 +1,162 @@
+{
+  "checked_at": "2026-09-12T13:50:56.517443+00:00",
+  "git_state": "main has no commits; current working-tree files hashed, not a commit audit",
+  "files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "98eb8ea02835daed48d16cf2d115c046127fd9ebc5b26476b09d1c70c13d3abc"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "4fb327932f7d322fff51f45edb3c9bd3cf59474c508c9e7ab014dfb9a1b6147f"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "8259ed65c830c2b4569b7047fac59bd3512ba1c4df1dd2ac33024baf673af51d"
+    },
+    {
+      "path": "app/build.gradle",
+      "sha256": "78abaa4f4bc53064a7eb052507f88ebd511df540cb4f858cd75d5014d7ada8d2"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "sha256": "46094a0df33a919264151dc45c1ddfdfb32c207bba4f1fb3d7bfa262cf8c968f"
+    },
+    {
+      "path": "app/src/main/assets/leaflet/LICENSE",
+      "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb"
+    },
+    {
+      "path": "app/src/main/assets/leaflet/leaflet.css",
+      "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+    },
+    {
+      "path": "app/src/main/assets/leaflet/leaflet.js",
+      "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+    },
+    {
+      "path": "app/src/main/assets/map.css",
+      "sha256": "77864fc7af7c6b81da6c7e4198439ffb09362b51c2434499c02dc8daa2664c20"
+    },
+    {
+      "path": "app/src/main/assets/map.html",
+      "sha256": "83a23896a0a92a4c5ad8cb1ce06a40b58f3642b586bd9ea31a288c9e438c8aa5"
+    },
+    {
+      "path": "app/src/main/assets/map.js",
+      "sha256": "7d6f92e21e00f7329376c58a8f107b4a13cc61ed4a133b6abce834c5304aa11c"
+    },
+    {
+      "path": "app/src/main/java/dev/routemock/app/DraftStore.java",
+      "sha256": "8bc3c43d18846eda7425ab320adc2fa0b9240437883b508da5a8ce3711894d2d"
+    },
+    {
+      "path": "app/src/main/java/dev/routemock/app/MainActivity.java",
+      "sha256": "563a72ceb0aebe8445a0e799e91befcdc43656d898004c897b674349b702a38b"
+    },
+    {
+      "path": "app/src/main/java/dev/routemock/app/MockLocationService.java",
+      "sha256": "5fbf95a4ff82d8a28bec553771ed2762b7ed3fc9e3d7d30cb13731a5e5913f90"
+    },
+    {
+      "path": "app/src/main/java/dev/routemock/app/MockSink.java",
+      "sha256": "ee405821bd4075d97935003bf0fed0043f849501cecdb3fe999a61fff714c81a"
+    },
+    {
+      "path": "app/src/main/java/dev/routemock/app/WalkingRouter.java",
+      "sha256": "b94bf150a7d8686e22f3ef87cf8a4da6d5937dac80e2a33202d97d71cfa9e825"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_location.xml",
+      "sha256": "e10cfb3301a6896e40a8ba67e23775b594e984432164f5671f85de1af9b0d62c"
+    },
+    {
+      "path": "app/src/main/res/values/styles.xml",
+      "sha256": "52238b439265bc0af6832c5d521aed2acefa962cef07a8c51fa95c5075c0d6e4"
+    },
+    {
+      "path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "sha256": "ea9c8be48c3cf8ad382dcd94ca4959deb66ee5b5223b8d44f47b39a396ab9bcb"
+    },
+    {
+      "path": "build.gradle",
+      "sha256": "96a33edb21d173da2c36f5312f50cdfb9f71d9f5078c081c81f2d029547f6cb9"
+    },
+    {
+      "path": "core/build.gradle",
+      "sha256": "5d6c34835ffa6916ab94a486a48ec7bc2c39325f695b060e46d270d814e8d652"
+    },
+    {
+      "path": "core/src/main/java/dev/routemock/core/GeoPoint.java",
+      "sha256": "0594cd037782c2900c614939812369398668d887a6f6a03fb4881e196195a691"
+    },
+    {
+      "path": "core/src/main/java/dev/routemock/core/RouteEngine.java",
+      "sha256": "d99aecd7c6ac754d28734f506011cbc25d65761c4db16ee694c7233d69de8a08"
+    },
+    {
+      "path": "core/src/test/java/dev/routemock/core/RouteEngineTest.java",
+      "sha256": "2294665268696bf32ccb9a5724960a9b55e1afb419be0a923ece3e6f92fbbd23"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "1bb6d43ff8af30abb0eaf03fe58f636ed9b37f758a748bf30a9cebd809639c9d"
+    },
+    {
+      "path": "gradle.properties",
+      "sha256": "3769ae5ed617c0706c6621ff3a3552aeb7d1dd936ecb3ed12f28b108fa65fd37"
+    },
+    {
+      "path": "gradlew",
+      "sha256": "734b3879d3501dce471cf0522d3bcbafe76873d9fc5129345b67fb43bd15e933"
+    },
+    {
+      "path": "gradlew.bat",
+      "sha256": "57931b17dd228e5c24dac90e815d0bf82477e831a4618dfab4136f5446b42a9f"
+    },
+    {
+      "path": "probe/build.gradle",
+      "sha256": "7ce2a097f6bcf43d7cae62cf2976ad70b7f56874f8ab19550d3279b64d762347"
+    },
+    {
+      "path": "probe/src/debug/AndroidManifest.xml",
+      "sha256": "6e441b40df5df2856e617741b6fa1c5ab488d824319bcdb5ce309e86e29ec663"
+    },
+    {
+      "path": "probe/src/debug/java/dev/routemock/probe/UiDriver.java",
+      "sha256": "afa03381d873f904e24740b47b76fd70397eb9bbf43387d560042f34356428e3"
+    },
+    {
+      "path": "probe/src/main/AndroidManifest.xml",
+      "sha256": "07d7c0bf999f8824ccabf1e1fad461802f54f84fb03de99dbedfac6d9d17198b"
+    },
+    {
+      "path": "probe/src/main/java/dev/routemock/probe/ProbeActivity.java",
+      "sha256": "3be2e0c54d62b57138d09196dc3047f868ca4e413e6daa302c1b7994b88b3ca2"
+    },
+    {
+      "path": "probe/src/main/res/drawable/ic_probe.xml",
+      "sha256": "318aa5c56852562a580cdb943f5d63e1d2a08a446c3b392b6abb1f3d477f4e20"
+    },
+    {
+      "path": "probe/src/main/res/values/styles.xml",
+      "sha256": "831c8f851932ba58f5db4406760d82fff13cf42f92c77e63c7546f0e08166619"
+    },
+    {
+      "path": "settings.gradle",
+      "sha256": "bbdd666f041ce3e912534e4708d5e2717a8c6472a7300cefea851d85bff4be75"
+    },
+    {
+      "path": "tools/ui_device.py",
+      "sha256": "521ca84fdb1a21cb93cc2ccbdff47869272ed0069743641bb738b44fb0a2e563"
+    },
+    {
+      "path": "tools/verify_probe.py",
+      "sha256": "26e66cd5132a62f1e14e782dd2b6215f6df18cb8496031f4e6469fe37c0a7375"
+    }
+  ]
+}

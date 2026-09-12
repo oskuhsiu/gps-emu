@@ -1,0 +1,18 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'dev.routemock.app'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'dev.routemock.app'
+        minSdk 35
+        targetSdk 36
+        versionCode providers.gradleProperty('releaseVersionCode').map { it.toInteger() }.getOrElse(1)
+        versionName providers.gradleProperty('releaseVersionName').getOrElse('0.1.0')
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError true }
+}
+dependencies {
+    implementation project(':core')
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+}

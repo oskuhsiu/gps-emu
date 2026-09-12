@@ -1,0 +1,165 @@
+name: Android release
+
+on:
+  push:
+    tags:
+      - '**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    if: ${{ !github.event.deleted }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v?(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$ ]]; then
+            echo '::error::Use a release tag such as v1.2.3 or 1.2.3.'
+            exit 1
+          fi
+          major=${BASH_REMATCH[1]}
+          minor=${BASH_REMATCH[2]}
+          patch=${BASH_REMATCH[3]}
+          if (( major > 2099 )); then
+            echo '::error::Major version must be <= 2099; minor and patch must be <= 999.'
+            exit 1
+          fi
+          version_code=$((major * 1000000 + minor * 1000 + patch + 1))
+          commit_sha=$(git rev-parse HEAD)
+          printf 'version_name=%s.%s.%s\nversion_code=%s\ncommit_sha=%s\n' \
+            "$major" "$minor" "$patch" "$version_code" "$commit_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check signing secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing repository secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install Android build packages
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-36' 'build-tools;35.0.0'
+
+      - name: Test, lint, and build release
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          ./gradlew --no-daemon --no-configuration-cache \
+            :core:test :app:lintRelease :app:assembleRelease \
+            -PreleaseVersionName="$VERSION_NAME" -PreleaseVersionCode="$VERSION_CODE"
+
+      - name: Align, sign, and verify APK
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          keystore=$(mktemp "$RUNNER_TEMP/routemock-keystore.XXXXXX")
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          build_tools="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p release-assets
+          "$build_tools/zipalign" -P 16 -f 4 \
+            app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
+          apk="release-assets/route-mock-${VERSION_NAME}-release.apk"
+          "$build_tools/apksigner" sign --ks "$keystore" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:ANDROID_KEY_PASSWORD \
+            --v4-signing-enabled false --out "$apk" "$RUNNER_TEMP/aligned.apk"
+          "$build_tools/apksigner" verify --verbose "$apk"
+          "$build_tools/zipalign" -c -P 16 4 "$apk"
+          (cd release-assets && sha256sum ./*.apk > SHA256SUMS.txt)
+
+      - name: Store verified release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-release
+          path: |
+            release-assets/*.apk
+            release-assets/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-release
+          path: release-assets
+
+      - name: Publish GitHub Release
+        working-directory: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          VERSION_NAME: ${{ needs.build.outputs.version_name }}
+          BUILD_COMMIT: ${{ needs.build.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS.txt
+          remote_commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)
+          if [[ "$remote_commit" != "$BUILD_COMMIT" ]]; then
+            echo '::error::The tag moved after the build. Refusing to publish mismatched artifacts.'
+            exit 1
+          fi
+          if draft=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft); then
+            if [[ "$draft" != true ]]; then
+              echo '::error::This tag already has a published release. Push a new version tag.'
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --target "$BUILD_COMMIT" --title "Route Mock $VERSION_NAME" \
+              --generate-notes --draft
+          fi
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            "route-mock-${VERSION_NAME}-release.apk" SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false

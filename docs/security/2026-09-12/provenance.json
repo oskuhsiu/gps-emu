@@ -1,0 +1,200 @@
+{
+  "audit": {
+    "checked_at_utc": "2026-09-12T13:50:42Z",
+    "workspace": ".",
+    "method": "Read-only SHA-256/SRI comparisons. Remote bytes were fetched into memory and inspected as bytes/archives; no fetched script or JAR was executed.",
+    "scope": [
+      "Bundled Leaflet 1.9.4 JS, CSS and LICENSE",
+      "Gradle 8.13 wrapper JAR, gradlew and gradlew.bat",
+      "Primary Leaflet security/advisory pages",
+      "Google Play services release notes and Maven metadata for play-services-location 21.3.0"
+    ]
+  },
+  "leaflet": {
+    "local_files": [
+      {
+        "path": "app/src/main/assets/leaflet/leaflet.js",
+        "length_bytes": 147552,
+        "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a",
+        "sri_sha256": "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      },
+      {
+        "path": "app/src/main/assets/leaflet/leaflet.css",
+        "length_bytes": 14806,
+        "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6",
+        "sri_sha256": "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      },
+      {
+        "path": "app/src/main/assets/leaflet/LICENSE",
+        "length_bytes": 1395,
+        "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb",
+        "sri_sha256": "sha256-U+jcJYYgFOQyR0HKGPvjYR4R1C72n1n4bqjFOJZH1Ms="
+      }
+    ],
+    "official_download_page": {
+      "url": "https://leafletjs.com/download.html",
+      "version": "1.9.4",
+      "release_date": "2023-05-18",
+      "published_sri": {
+        "leaflet.js": "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=",
+        "leaflet.css": "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      },
+      "result": "Both local JS and CSS SRI values match the official download page."
+    },
+    "published_bytes": {
+      "npm_tarball_url": "https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz",
+      "npm_metadata_url": "https://registry.npmjs.org/leaflet/1.9.4",
+      "tarball_length_bytes": 869361,
+      "tarball_sha256": "84c65a256e50657896f54c33bd857b6849ebe94c817803be818bf32a3dde0b77",
+      "tarball_metadata": {
+        "version": "1.9.4",
+        "license": "BSD-2-Clause",
+        "npm_shasum": "23fae724e282fa25745aff82ca4d394748db7d8d",
+        "npm_integrity": "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="
+      },
+      "file_comparisons": {
+        "dist/leaflet.js": "exact byte match",
+        "dist/leaflet.css": "exact byte match",
+        "LICENSE": "exact byte match"
+      },
+      "direct_unpkg_url": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+      "direct_unpkg_css_url": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+      "unpkg_comparisons": {
+        "dist/leaflet.js": "exact byte match",
+        "dist/leaflet.css": "exact byte match"
+      }
+    },
+    "upstream_v1_9_4": {
+      "tag_ref_url": "https://api.github.com/repos/Leaflet/Leaflet/git/ref/tags/v1.9.4",
+      "tag_object_sha": "91900f7b177e6a926dfc3a75c86dc11fd4f2cf34",
+      "source_archive_url": "https://github.com/Leaflet/Leaflet/archive/refs/tags/v1.9.4.tar.gz",
+      "source_archive_length_bytes": 8470612,
+      "source_archive_sha256": "f92d2b484dfe62a3001e03b94ab21fc12fe8c22d0174d698bef04b259a666d2b",
+      "source_archive_observations": [
+        "package.json reports version 1.9.4",
+        "LICENSE is an exact byte match to the bundled LICENSE",
+        "The source archive does not contain dist/leaflet.js; the upstream FAQ says built files are supplied through the download/package distribution."
+      ],
+      "source_license_url": "https://raw.githubusercontent.com/Leaflet/Leaflet/v1.9.4/LICENSE"
+    },
+    "security_sources": [
+      {
+        "url": "https://github.com/Leaflet/Leaflet/security/advisories",
+        "source_type": "official repository advisory page",
+        "checked_at_utc": "2026-09-12T13:50:42Z",
+        "observed_text": "There aren't any published security advisories.",
+        "applicability": "No maintainer-published GitHub repository advisory was listed at retrieval time; this is not proof of no vulnerabilities."
+      },
+      {
+        "url": "https://github.com/advisories/GHSA-h5cx-hfj5-x8v3",
+        "source_type": "GitHub Advisory Database entry, sourced from NVD",
+        "identifier": "CVE-2025-69993 / GHSA-h5cx-hfj5-x8v3",
+        "published": "2026-04-14",
+        "updated": "2026-04-21",
+        "severity": "Moderate, CVSS 6.1",
+        "version_claim": "Leaflet versions up to and including 1.9.4",
+        "claim": "XSS via bindPopup() when attacker-controlled input is rendered as raw HTML.",
+        "applicability": "Version-applicable alert recorded by the database; whether it applies depends on whether the application passes attacker-controlled content to the documented HTML sink."
+      },
+      {
+        "url": "https://github.com/Leaflet/Leaflet/issues/10214",
+        "source_type": "official Leaflet maintainer statement",
+        "published": "2026-05-12",
+        "claim": "Maintainers state that CVE-2025-69993 describes documented, intentional HTML rendering behavior, place sanitization responsibility on the calling application, and say they formally disputed the CVE with MITRE.",
+        "applicability": "This is the maintainer position and does not remove the need to inspect this app's actual popup/tooltip inputs."
+      }
+    ]
+  },
+  "gradle_wrapper": {
+    "local_files": [
+      {
+        "path": "gradle/wrapper/gradle-wrapper.jar",
+        "length_bytes": 43705,
+        "sha256": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f"
+      },
+      {
+        "path": "gradlew",
+        "length_bytes": 8752,
+        "sha256": "734b3879d3501dce471cf0522d3bcbafe76873d9fc5129345b67fb43bd15e933"
+      },
+      {
+        "path": "gradlew.bat",
+        "length_bytes": 2966,
+        "sha256": "57931b17dd228e5c24dac90e815d0bf82477e831a4618dfab4136f5446b42a9f"
+      }
+    ],
+    "upstream_tag": {
+      "tag": "v8.13.0",
+      "commit": "073314332697ba45c16c0a0ce1891fa6794179ff",
+      "tag_ref_url": "https://api.github.com/repos/gradle/gradle/git/ref/tags/v8.13.0",
+      "files": {
+        "gradle-wrapper.jar": {
+          "url": "https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradle/wrapper/gradle-wrapper.jar",
+          "length_bytes": 43705,
+          "sha256": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f",
+          "comparison": "exact byte match"
+        },
+        "gradlew": {
+          "url": "https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradlew",
+          "length_bytes": 8774,
+          "sha256": "c76f16038b4e70b84ed0b3b9e08e82a8ecaf66ec0efdfdecdece92520fa3cecb",
+          "comparison": "raw bytes differ; LF-normalized semantic diff is one line"
+        },
+        "gradlew.bat": {
+          "url": "https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradlew.bat",
+          "length_bytes": 2894,
+          "sha256": "0f3ed8f03b50934cb8c48b15a470d5c20a30a5385825e48b55bcc8ea3d8f8e18",
+          "comparison": "raw bytes differ; CRLF/LF plus one line after LF normalization"
+        }
+      },
+      "script_diff": {
+        "gradlew": "Upstream DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 \"-Xmx64m\" \"-Xms64m\"'; local DEFAULT_JVM_OPTS='\"-Xmx64m\" \"-Xms64m\"'.",
+        "gradlew.bat": "Upstream set DEFAULT_JVM_OPTS=-Dfile.encoding=UTF-8 \"-Xmx64m\" \"-Xms64m\"; local set DEFAULT_JVM_OPTS=\"-Xmx64m\" \"-Xms64m\". Local file uses CRLF; upstream raw file uses LF.",
+        "interpretation": "The JAR matches exactly. Script mismatches are recorded for primary review; this evidence does not classify them as malicious or benign."
+      }
+    },
+    "official_distribution_checksums": {
+      "wrapper_checksum_url": "https://services.gradle.org/distributions/gradle-8.13-wrapper.jar.sha256",
+      "wrapper_checksum_body": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f",
+      "wrapper_checksum_matches_local": true,
+      "bin_distribution_checksum_url": "https://services.gradle.org/distributions/gradle-8.13-bin.zip.sha256",
+      "bin_distribution_checksum_body": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+      "local_pinned_distribution_checksum": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+      "pinned_checksum_matches_official": true,
+      "note": "The 130.64 MB binary distribution itself was not downloaded; only the official checksum text was fetched and compared with gradle-wrapper.properties."
+    }
+  },
+  "google_play_services_location": {
+    "declared_dependency": "com.google.android.gms:play-services-location:21.3.0",
+    "local_reference": "app/build.gradle",
+    "official_release_notes_url": "https://developers.google.com/android/guides/releases?hl=en",
+    "release_notes_observation": {
+      "entry_date": "2024-05-29",
+      "observed_text": "The latest updates to several libraries changed minSdkVersion to 21 and updated play-services-base, play-services-basement and play-services-tasks dependencies; the artifacts list includes play-services-location:21.3.0.",
+      "security_observation": "The read 21.3.0 release-note entry contains no explicit security advisory or security fix for play-services-location.",
+      "latest_setup_page_url": "https://developers.google.com/android/guides/setup",
+      "latest_setup_observation": "The current setup page lists play-services-location:21.4.0, so 21.3.0 is no longer the current example version as of this audit."
+    },
+    "official_maven_metadata": {
+      "pom_url": "https://dl.google.com/dl/android/maven2/com/google/android/gms/play-services-location/21.3.0/play-services-location-21.3.0.pom",
+      "pom_length_bytes": 2045,
+      "pom_sha256": "d39695bcf029afb9ace67bf04d03454a0622c956641353fba16064d1fdc7b791",
+      "coordinates": "com.google.android.gms:play-services-location:21.3.0",
+      "declared_dependencies": [
+        "com.google.android.gms:play-services-base:18.5.0",
+        "com.google.android.gms:play-services-basement:18.4.0",
+        "com.google.android.gms:play-services-tasks:18.2.0",
+        "org.jetbrains.kotlin:kotlin-stdlib:1.9.0",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
+      ]
+    },
+    "bounded_result": "No version-specific Google security alert was found in the official release-note entry read for 21.3.0; this is a release-note observation, not a claim that the SDK or all transitive dependencies have no vulnerabilities."
+  },
+  "limitations": [
+    "This is provenance and bounded advisory evidence, not a complete vulnerability assessment or a final security verdict.",
+    "The GitHub Advisory Database record and official Leaflet maintainer statement conflict on whether CVE-2025-69993 is a Leaflet vulnerability; application input flow determines practical exposure.",
+    "The official Leaflet source tag omits the built JavaScript file; the exact built-file comparison therefore uses the official Leaflet npm 1.9.4 package and unpkg distribution, while source-tag LICENSE/package metadata were checked separately.",
+    "Wrapper scripts do not hash-match the Gradle v8.13.0 tag and require primary review; only the wrapper JAR and official distribution checksum matched exactly."
+  ]
+}

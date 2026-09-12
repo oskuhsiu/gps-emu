@@ -1,0 +1,7 @@
+# Keep project text consistent across developer machines and CI.
+* text=auto eol=lf
+
+# Preserve audited upstream bytes, including their original line endings.
+/app/src/main/assets/leaflet/* -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+/gradlew.bat -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+*.jar binary

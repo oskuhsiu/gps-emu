@@ -1,0 +1,100 @@
+# Gradle, Android and native build caches/outputs.
+.gradle/
+.gradle-local/
+.kotlin/
+**/build/
+.cxx/
+.externalNativeBuild/
+/captures/
+/.runtime/
+/release-assets/
+
+# Generated packages, bytecode and profiling output.
+# The verified Gradle wrapper JAR is required for a fresh checkout to build.
+*.apk
+*.aab
+*.ap_
+*.aar
+*.jar
+!/gradle/wrapper/gradle-wrapper.jar
+*.dex
+*.class
+*.hprof
+*.heapdump
+*.trace
+
+# Local SDK paths, signing material and credentials.
+local.properties
+keystore.properties
+signing.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+.env
+.env.*
+!.env.example
+!.env.sample
+/secrets/
+/credentials/
+.credentials/
+service-account*.json
+*-service-account.json
+
+# IDE and editor state.
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+*~
+
+# Python helper caches and virtual environments.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+
+# Logs and operating-system metadata.
+*.log
+*.log.*
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Desktop.ini
+
+# Local agent instructions and handoff files (owner's prior preference).
+/AGENTS.md
+/ARCHITECTURE.md
+/handoff.md
+/CLAUDE.md
+/.agents/
+/.codex/
+/.claude/
+
+# GitHub issue #1 is authoritative; these are local drafting/research copies.
+# Keep design, ADRs, research summaries and security reports under version control.
+/docs/issues/
+/docs/grill.md
+/docs/research/oss-evidence.json
+
+# Raw emulator/device evidence can contain local paths and device metadata.
+# Only these reviewed, compact result summaries are intended for publication.
+/docs/evidence/*
+!/docs/evidence/2026-09-12/
+/docs/evidence/2026-09-12/*
+!/docs/evidence/2026-09-12/artifacts.json
+!/docs/evidence/2026-09-12/receiver-assertions.json

@@ -1,0 +1,148 @@
+{
+  "scope": "DEX class-name attribution and ZIP inventory; not method equivalence, full decompilation, malware engine scan, or runtime traffic capture. Generated/app classification is syntactic.",
+  "apks": [
+    {
+      "path": "app/build/outputs/apk/release/app-release-unsigned.apk",
+      "sha256": "38438b7a09f79917784a4b528a0c63c0a1a21c3584f2665103e01609a989f6fb",
+      "bytes": 4996567,
+      "dex_files": [
+        "classes.dex"
+      ],
+      "class_count": 3863,
+      "artifact_class_matches": 3722,
+      "unmatched_generated_or_app_count": 141,
+      "unexplained_classes": [],
+      "native_libraries": [],
+      "probe_classes": [],
+      "assets": [
+        {
+          "path": "assets/leaflet/LICENSE",
+          "matches_source": true,
+          "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb"
+        },
+        {
+          "path": "assets/leaflet/leaflet.css",
+          "matches_source": true,
+          "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+        },
+        {
+          "path": "assets/leaflet/leaflet.js",
+          "matches_source": true,
+          "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+        },
+        {
+          "path": "assets/map.css",
+          "matches_source": true,
+          "sha256": "77864fc7af7c6b81da6c7e4198439ffb09362b51c2434499c02dc8daa2664c20"
+        },
+        {
+          "path": "assets/map.html",
+          "matches_source": true,
+          "sha256": "83a23896a0a92a4c5ad8cb1ce06a40b58f3642b586bd9ea31a288c9e438c8aa5"
+        },
+        {
+          "path": "assets/map.js",
+          "matches_source": true,
+          "sha256": "7d6f92e21e00f7329376c58a8f107b4a13cc61ed4a133b6abce834c5304aa11c"
+        }
+      ],
+      "url_strings": [
+        "http://",
+        "http://schemas.android.com/apk/res/android",
+        "https://",
+        "https://plus.google.com/",
+        "https://routemock.local/map.html",
+        "https://routing.openstreetmap.de/routed-foot/route/v1/foot/",
+        "https://www.googleapis.com/auth/appstate",
+        "https://www.googleapis.com/auth/datastoremobile",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.appdata",
+        "https://www.googleapis.com/auth/drive.apps",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/games",
+        "https://www.googleapis.com/auth/games.firstparty",
+        "https://www.googleapis.com/auth/games_lite",
+        "https://www.googleapis.com/auth/plus.login",
+        "https://www.googleapis.com/auth/plus.me",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile"
+      ],
+      "executable_extension_candidates": [
+        "DebugProbesKt.bin"
+      ]
+    },
+    {
+      "path": "app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "be97da10739cdaae514223c4ebf8145fb081bc4cbf3fa8d31ba74f0f9819fb31",
+      "bytes": 6049176,
+      "dex_files": [
+        "classes.dex",
+        "classes2.dex",
+        "classes3.dex",
+        "classes4.dex"
+      ],
+      "class_count": 3870,
+      "artifact_class_matches": 3722,
+      "unmatched_generated_or_app_count": 148,
+      "unexplained_classes": [],
+      "native_libraries": [],
+      "probe_classes": [],
+      "assets": [
+        {
+          "path": "assets/leaflet/LICENSE",
+          "matches_source": true,
+          "sha256": "53e8dc25862014e4324741ca18fbe3611e11d42ef69f59f86ea8c5389647d4cb"
+        },
+        {
+          "path": "assets/leaflet/leaflet.css",
+          "matches_source": true,
+          "sha256": "a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6"
+        },
+        {
+          "path": "assets/leaflet/leaflet.js",
+          "matches_source": true,
+          "sha256": "db49d009c841f5ca34a888c96511ae936fd9f5533e90d8b2c4d57596f4e5641a"
+        },
+        {
+          "path": "assets/map.css",
+          "matches_source": true,
+          "sha256": "77864fc7af7c6b81da6c7e4198439ffb09362b51c2434499c02dc8daa2664c20"
+        },
+        {
+          "path": "assets/map.html",
+          "matches_source": true,
+          "sha256": "83a23896a0a92a4c5ad8cb1ce06a40b58f3642b586bd9ea31a288c9e438c8aa5"
+        },
+        {
+          "path": "assets/map.js",
+          "matches_source": true,
+          "sha256": "7d6f92e21e00f7329376c58a8f107b4a13cc61ed4a133b6abce834c5304aa11c"
+        }
+      ],
+      "url_strings": [
+        "http://",
+        "http://schemas.android.com/apk/res/android",
+        "https://",
+        "https://plus.google.com/",
+        "https://routemock.local/map.html",
+        "https://routing.openstreetmap.de/routed-foot/route/v1/foot/",
+        "https://www.googleapis.com/auth/appstate",
+        "https://www.googleapis.com/auth/datastoremobile",
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/drive.appdata",
+        "https://www.googleapis.com/auth/drive.apps",
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/games",
+        "https://www.googleapis.com/auth/games.firstparty",
+        "https://www.googleapis.com/auth/games_lite",
+        "https://www.googleapis.com/auth/plus.login",
+        "https://www.googleapis.com/auth/plus.me",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile"
+      ],
+      "executable_extension_candidates": [
+        "DebugProbesKt.bin"
+      ]
+    }
+  ]
+}

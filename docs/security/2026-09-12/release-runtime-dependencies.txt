@@ -1,0 +1,82 @@
+releaseRuntimeClasspath - Resolved configuration for runtime for variant: release
++--- project :core
+\--- com.google.android.gms:play-services-location:21.3.0
+     +--- com.google.android.gms:play-services-base:18.5.0
+     |    +--- androidx.collection:collection:1.0.0 -> 1.1.0
+     |    |    \--- androidx.annotation:annotation:1.1.0
+     |    +--- androidx.core:core:1.2.0
+     |    |    +--- androidx.annotation:annotation:1.1.0
+     |    |    +--- androidx.lifecycle:lifecycle-runtime:2.0.0 -> 2.1.0
+     |    |    |    +--- androidx.lifecycle:lifecycle-common:2.1.0
+     |    |    |    |    \--- androidx.annotation:annotation:1.1.0
+     |    |    |    +--- androidx.arch.core:core-common:2.1.0
+     |    |    |    |    \--- androidx.annotation:annotation:1.1.0
+     |    |    |    \--- androidx.annotation:annotation:1.1.0
+     |    |    +--- androidx.versionedparcelable:versionedparcelable:1.1.0
+     |    |    |    +--- androidx.annotation:annotation:1.1.0
+     |    |    |    \--- androidx.collection:collection:1.0.0 -> 1.1.0 (*)
+     |    |    \--- androidx.collection:collection:1.0.0 -> 1.1.0 (*)
+     |    +--- androidx.fragment:fragment:1.0.0 -> 1.1.0
+     |    |    +--- androidx.annotation:annotation:1.1.0
+     |    |    +--- androidx.core:core:1.1.0 -> 1.2.0 (*)
+     |    |    +--- androidx.collection:collection:1.1.0 (*)
+     |    |    +--- androidx.viewpager:viewpager:1.0.0
+     |    |    |    +--- androidx.annotation:annotation:1.0.0 -> 1.1.0
+     |    |    |    +--- androidx.core:core:1.0.0 -> 1.2.0 (*)
+     |    |    |    \--- androidx.customview:customview:1.0.0
+     |    |    |         +--- androidx.annotation:annotation:1.0.0 -> 1.1.0
+     |    |    |         \--- androidx.core:core:1.0.0 -> 1.2.0 (*)
+     |    |    +--- androidx.loader:loader:1.0.0
+     |    |    |    +--- androidx.annotation:annotation:1.0.0 -> 1.1.0
+     |    |    |    +--- androidx.core:core:1.0.0 -> 1.2.0 (*)
+     |    |    |    +--- androidx.lifecycle:lifecycle-livedata:2.0.0
+     |    |    |    |    +--- androidx.arch.core:core-runtime:2.0.0
+     |    |    |    |    |    +--- androidx.annotation:annotation:1.0.0 -> 1.1.0
+     |    |    |    |    |    \--- androidx.arch.core:core-common:2.0.0 -> 2.1.0 (*)
+     |    |    |    |    +--- androidx.lifecycle:lifecycle-livedata-core:2.0.0
+     |    |    |    |    |    +--- androidx.lifecycle:lifecycle-common:2.0.0 -> 2.1.0 (*)
+     |    |    |    |    |    +--- androidx.arch.core:core-common:2.0.0 -> 2.1.0 (*)
+     |    |    |    |    |    \--- androidx.arch.core:core-runtime:2.0.0 (*)
+     |    |    |    |    \--- androidx.arch.core:core-common:2.0.0 -> 2.1.0 (*)
+     |    |    |    \--- androidx.lifecycle:lifecycle-viewmodel:2.0.0 -> 2.1.0
+     |    |    |         \--- androidx.annotation:annotation:1.1.0
+     |    |    +--- androidx.activity:activity:1.0.0
+     |    |    |    +--- androidx.annotation:annotation:1.1.0
+     |    |    |    +--- androidx.core:core:1.1.0 -> 1.2.0 (*)
+     |    |    |    +--- androidx.lifecycle:lifecycle-runtime:2.1.0 (*)
+     |    |    |    +--- androidx.lifecycle:lifecycle-viewmodel:2.1.0 (*)
+     |    |    |    \--- androidx.savedstate:savedstate:1.0.0
+     |    |    |         +--- androidx.annotation:annotation:1.1.0
+     |    |    |         +--- androidx.arch.core:core-common:2.0.1 -> 2.1.0 (*)
+     |    |    |         \--- androidx.lifecycle:lifecycle-common:2.0.0 -> 2.1.0 (*)
+     |    |    \--- androidx.lifecycle:lifecycle-viewmodel:2.0.0 -> 2.1.0 (*)
+     |    +--- com.google.android.gms:play-services-basement:18.4.0
+     |    |    +--- androidx.collection:collection:1.0.0 -> 1.1.0 (*)
+     |    |    +--- androidx.core:core:1.2.0 (*)
+     |    |    \--- androidx.fragment:fragment:1.1.0 (*)
+     |    \--- com.google.android.gms:play-services-tasks:18.2.0
+     |         \--- com.google.android.gms:play-services-basement:18.4.0 (*)
+     +--- com.google.android.gms:play-services-basement:18.4.0 (*)
+     +--- com.google.android.gms:play-services-tasks:18.2.0 (*)
+     +--- org.jetbrains.kotlin:kotlin-stdlib:1.9.0
+     |    +--- org.jetbrains.kotlin:kotlin-stdlib-common:1.9.0
+     |    \--- org.jetbrains:annotations:13.0 -> 23.0.0
+     +--- org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3
+     |    +--- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3
+     |    |    \--- org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3
+     |    |         +--- org.jetbrains:annotations:23.0.0
+     |    |         +--- org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.7.3
+     |    |         |    +--- org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3 (c)
+     |    |         |    +--- org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3 (c)
+     |    |         |    \--- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3 (c)
+     |    |         +--- org.jetbrains.kotlin:kotlin-stdlib-common:1.8.20 -> 1.9.0
+     |    |         \--- org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20
+     |    |              +--- org.jetbrains.kotlin:kotlin-stdlib:1.8.20 -> 1.9.0 (*)
+     |    |              \--- org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20
+     |    |                   \--- org.jetbrains.kotlin:kotlin-stdlib:1.8.20 -> 1.9.0 (*)
+     |    +--- org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.7.3 (*)
+     |    \--- org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20 (*)
+     \--- org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3 (*)
+
+(c) - A dependency constraint, not a dependency. The dependency affected by the constraint occurs elsewhere in the tree.
+(*) - Indicates repeated occurrences of a transitive dependency subtree. Gradle expands transitive dependency subtrees only once per project; repeat occurrences only display the root of the subtree, followed by this annotation.

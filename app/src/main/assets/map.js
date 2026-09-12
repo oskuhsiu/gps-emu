@@ -1,0 +1,20 @@
+'use strict';
+const map=L.map('map',{zoomControl:true}).setView([25.033,121.5654],15);
+const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> | <a href="https://www.openstreetmap.org/fixthemap">修正地圖</a><br>步行路由：FOSSGIS / OSRM'}).addTo(map);
+tiles.on('tileerror',()=>{document.getElementById('tile-error').hidden=false});
+tiles.on('tileload',()=>{document.getElementById('tile-error').hidden=true});
+const points=L.layerGroup().addTo(map);
+const line=L.polyline([],{color:'#087e78',weight:5,opacity:0.9}).addTo(map);
+let current=null,editable=true;
+map.on('click',e=>{if(editable)RouteMock.addPoint(e.latlng.lat,e.latlng.lng)});
+window.showDraft=(waypoints,route,fit)=>{
+ points.clearLayers();
+ waypoints.forEach((p,i)=>L.marker(p,{icon:L.divIcon({html:String(i+1),className:'point',iconSize:[24,24],iconAnchor:[12,12]})}).addTo(points));
+ line.setLatLngs(route);
+ const bounds=route.length?route:waypoints;
+ if(fit&&bounds.length>1)map.fitBounds(L.latLngBounds(bounds),{padding:[24,24],maxZoom:17});
+ else if(fit&&bounds.length===1)map.setView(bounds[0],16);
+};
+window.showPosition=(lat,lon)=>{if(!current)current=L.circleMarker([lat,lon],{radius:8,weight:3,color:'white',fillColor:'#e87939',fillOpacity:1}).addTo(map);else if(current.getLatLng().lat!==lat||current.getLatLng().lng!==lon)current.setLatLng([lat,lon]);};
+window.clearPosition=()=>{if(current){map.removeLayer(current);current=null;}};
+window.setEditable=value=>{editable=value;};
