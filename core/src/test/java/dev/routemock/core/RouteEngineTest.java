@@ -16,7 +16,7 @@ public class RouteEngineTest {
         assertEquals(111_195.08, GeoPoint.distanceMeters(ORIGIN, EAST), 0.1);
         assertEquals(10_007_557.22, RouteEngine.distanceMeters(ORIGIN, new GeoPoint(90, 0)), 0.1);
         var sample = straight(3.6).sample(seconds(100));
-        assertEquals(100, sample.traveledMeters(), 1e-9);
+        assertEquals(100, sample.routePositionMeters(), 1e-9);
         assertEquals(100, GeoPoint.distanceMeters(ORIGIN, sample.point()), 0.001);
         assertEquals(0, sample.point().latitude(), 1e-10);
         assertEquals(90, sample.bearingDegrees(), 0.001);
@@ -27,7 +27,7 @@ public class RouteEngineTest {
     @Test public void speedChangeSettlesOldSpeedBeforeApplyingNewSpeed() {
         var engine = straight(3.6);
         engine.setSpeedKmh(7.2, seconds(10));
-        assertEquals(30, engine.sample(seconds(20)).traveledMeters(), 1e-9);
+        assertEquals(30, engine.sample(seconds(20)).routePositionMeters(), 1e-9);
     }
 
     @Test public void pauseResumeDoesNotAccumulatePausedTimeAndAllowsSpeedChanges() {
@@ -35,13 +35,13 @@ public class RouteEngineTest {
         engine.pause(seconds(10));
         var paused = engine.sample(seconds(100));
         assertEquals(RouteEngine.Phase.PAUSED, paused.phase());
-        assertEquals(10, paused.traveledMeters(), 1e-9);
+        assertEquals(10, paused.routePositionMeters(), 1e-9);
         assertEquals(0, paused.speedMps(), 0);
         engine.setSpeedKmh(7.2, seconds(150));
         engine.pause(seconds(175));
         engine.resume(seconds(200));
         engine.resume(seconds(205));
-        assertEquals(30, engine.sample(seconds(210)).traveledMeters(), 1e-9);
+        assertEquals(30, engine.sample(seconds(210)).routePositionMeters(), 1e-9);
     }
 
     @Test public void stopFreezesLastSampleAcrossDelayedTicks() {
@@ -93,7 +93,7 @@ public class RouteEngineTest {
     private static void assertStoppedAt(RouteEngine.Sample previous, RouteEngine.Sample stopped) {
         assertEquals(RouteEngine.Phase.STOPPED, stopped.phase());
         assertEquals(previous.point(), stopped.point());
-        assertEquals(previous.traveledMeters(), stopped.traveledMeters(), 0);
+        assertEquals(previous.routePositionMeters(), stopped.routePositionMeters(), 0);
         assertEquals(previous.totalMeters(), stopped.totalMeters(), 0);
         assertEquals(0, stopped.speedMps(), 0);
     }
@@ -102,14 +102,14 @@ public class RouteEngineTest {
         GeoPoint corner = new GeoPoint(0, 0.001), end = new GeoPoint(0.001, 0.001);
         var engine = new RouteEngine(List.of(ORIGIN, corner, end), 3.6, 0);
         var afterCorner = engine.sample(seconds(150));
-        assertEquals(150, afterCorner.traveledMeters(), 1e-9);
+        assertEquals(150, afterCorner.routePositionMeters(), 1e-9);
         assertEquals(0.001, afterCorner.point().longitude(), 1e-10);
         assertTrue(afterCorner.point().latitude() > 0);
         assertEquals(38.805, GeoPoint.distanceMeters(corner, afterCorner.point()), 0.01);
         var arrived = engine.sample(seconds(1000));
         assertEquals(end, arrived.point());
         assertEquals(RouteEngine.Phase.ARRIVED, arrived.phase());
-        assertEquals(arrived.totalMeters(), arrived.traveledMeters(), 0);
+        assertEquals(arrived.totalMeters(), arrived.routePositionMeters(), 0);
         assertEquals(0, arrived.speedMps(), 0);
         engine.pause(seconds(2000));
         engine.resume(seconds(3000));
@@ -129,7 +129,7 @@ public class RouteEngineTest {
             assertEquals(0, sample.speedMps(), 0);
         }
         var duplicateSegments = new RouteEngine(List.of(ORIGIN, ORIGIN, EAST, EAST), 3.6, 0);
-        assertEquals(100, duplicateSegments.sample(seconds(100)).traveledMeters(), 1e-9);
+        assertEquals(100, duplicateSegments.sample(seconds(100)).routePositionMeters(), 1e-9);
     }
 
     @Test public void crossesAntimeridianOnShortArc() {
@@ -163,13 +163,13 @@ public class RouteEngineTest {
 
     @Test public void backwardClocksDoNotRegressOrDoubleCountTime() {
         var engine = straight(3.6);
-        assertEquals(10, engine.sample(seconds(10)).traveledMeters(), 0);
-        assertEquals(10, engine.sample(seconds(5)).traveledMeters(), 0);
+        assertEquals(10, engine.sample(seconds(10)).routePositionMeters(), 0);
+        assertEquals(10, engine.sample(seconds(5)).routePositionMeters(), 0);
         engine.setSpeedKmh(7.2, seconds(8));
-        assertEquals(20, engine.sample(seconds(15)).traveledMeters(), 0);
+        assertEquals(20, engine.sample(seconds(15)).routePositionMeters(), 0);
         engine.pause(seconds(12));
         engine.resume(seconds(14));
-        assertEquals(30, engine.sample(seconds(20)).traveledMeters(), 0);
+        assertEquals(30, engine.sample(seconds(20)).routePositionMeters(), 0);
     }
 
     @Test public void invalidInputRejectedWithoutMutatingActiveProgress() {
@@ -189,14 +189,14 @@ public class RouteEngineTest {
         assertThrows(NullPointerException.class, () -> new RouteEngine(null, 5, 0));
         var engine = straight(3.6);
         assertThrows(IllegalArgumentException.class, () -> engine.setSpeedKmh(0, seconds(10)));
-        assertEquals(5, engine.sample(seconds(5)).traveledMeters(), 0);
+        assertEquals(5, engine.sample(seconds(5)).routePositionMeters(), 0);
     }
 
     @Test public void routeSnapshotIsIndependentOfCallerMutations() {
         var input = new ArrayList<>(List.of(ORIGIN, EAST));
         var engine = new RouteEngine(input, 3.6, 0);
         input.clear();
-        assertEquals(100, engine.sample(seconds(100)).traveledMeters(), 0);
+        assertEquals(100, engine.sample(seconds(100)).routePositionMeters(), 0);
     }
 
     @Test public void enormousClockGapArrivesWithoutOverflow() {

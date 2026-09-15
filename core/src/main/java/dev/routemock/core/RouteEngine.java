@@ -6,28 +6,36 @@ import java.util.Objects;
 
 /**
  * Single-thread-confined route playback using monotonic nanoseconds and a spherical Earth.
- * Backward timestamps are clamped to the latest observed time, including command timestamps:
- * neither progress nor the clock moves backward. Commands still take effect at that latest time.
+ * Backward timestamps are clamped to the latest observed time, including command timestamps,
+ * so elapsed time is never counted twice. Commands still take effect at that latest time.
  */
 public final class RouteEngine {
     public static final int MAX_POINTS = 10_000;
     private static final double EARTH_RADIUS_METERS = 6_371_008.8;
 
     public enum Phase { MOVING, PAUSED, HOLDING, ARRIVED, STOPPED }
+    /** routePositionMeters is distance along the base geometry; it decreases on return and wraps in a loop. */
     public record Sample(GeoPoint point, double speedMps, float bearingDegrees,
-                         double traveledMeters, double totalMeters, Phase phase) {}
+                         double routePositionMeters, double totalMeters, Phase phase) {}
 
     private final List<GeoPoint> points;
     private final double[] lengths;
     private final double totalMeters;
     private double speedMps;
-    private double traveledMeters;
+    // Bounded distance within one playback cycle (base-route distance for ONCE).
+    private double cyclePositionMeters;
+    private final PlaybackMode mode;
     private long lastNanos;
     private Phase phase;
 
     public RouteEngine(List<GeoPoint> points, double speedKmh, long nowNanos) {
+        this(points, speedKmh, PlaybackMode.ONCE, nowNanos);
+    }
+
+    public RouteEngine(List<GeoPoint> points, double speedKmh, PlaybackMode mode, long nowNanos) {
         validateSpeed(speedKmh);
         validatePoints(points);
+        this.mode = Objects.requireNonNull(mode, "mode");
         var unique = new ArrayList<GeoPoint>();
         for (GeoPoint point : points) {
             if (unique.isEmpty() || distanceMeters(unique.get(unique.size() - 1), point) > 1e-8) {
@@ -42,6 +50,9 @@ public final class RouteEngine {
             total += lengths[i];
         }
         totalMeters = total;
+        if (total > 0 && mode == PlaybackMode.LOOP && !points.get(0).equals(points.get(points.size() - 1))) {
+            throw new IllegalArgumentException("Loop route must end at its exact starting point");
+        }
         speedMps = speedKmh / 3.6;
         lastNanos = nowNanos;
         phase = total == 0 ? Phase.HOLDING : Phase.MOVING;
@@ -50,20 +61,29 @@ public final class RouteEngine {
     public Sample sample(long nowNanos) {
         advance(nowNanos);
         if (totalMeters == 0) return new Sample(points.get(0), 0, 0, 0, 0, phase);
-        if (traveledMeters >= totalMeters) {
+        boolean reverse = mode == PlaybackMode.PING_PONG && cyclePositionMeters >= totalMeters;
+        double routePositionMeters = reverse ? 2 * totalMeters - cyclePositionMeters : cyclePositionMeters;
+        if (mode == PlaybackMode.ONCE && routePositionMeters >= totalMeters) {
             return new Sample(points.get(points.size() - 1), 0, 0, totalMeters, totalMeters, phase);
         }
-        double remaining = traveledMeters;
+        double remaining = routePositionMeters;
         int segment = 0;
-        while (segment < lengths.length - 1 && remaining >= lengths[segment]) {
+        // At a vertex, use the segment we are about to traverse in the current direction.
+        while (segment < lengths.length - 1) {
+            // Reflection/subtraction can put an exact vertex a few ulps on the wrong leg.
+            if (mode != PlaybackMode.ONCE && Math.abs(remaining - lengths[segment]) <= 4 * Math.ulp(totalMeters)) {
+                remaining = lengths[segment];
+            }
+            if (reverse ? remaining <= lengths[segment] : remaining < lengths[segment]) break;
             remaining -= lengths[segment++];
         }
-        GeoPoint end = points.get(segment + 1);
-        GeoPoint position = interpolate(points.get(segment), end, remaining / lengths[segment]);
-        GeoPoint ahead = interpolate(points.get(segment), end,
-                Math.min(1, (remaining + 1) / lengths[segment]));
+        GeoPoint start = points.get(segment), end = points.get(segment + 1);
+        GeoPoint position = interpolate(start, end, remaining / lengths[segment]);
+        double aheadMeters = reverse ? Math.max(0, remaining - 1) : Math.min(lengths[segment], remaining + 1);
+        // Decrease the original arc fraction on return, including deterministic antipodal arcs.
+        GeoPoint ahead = interpolate(start, end, aheadMeters / lengths[segment]);
         return new Sample(position, phase == Phase.MOVING ? speedMps : 0,
-                bearing(position, ahead), traveledMeters, totalMeters, phase);
+                bearing(position, ahead), routePositionMeters, totalMeters, phase);
     }
 
     public void setSpeedKmh(double speedKmh, long nowNanos) {
@@ -94,8 +114,14 @@ public final class RouteEngine {
         double seconds = (elapsed >= 0 ? elapsed : (double) nowNanos - lastNanos) / 1_000_000_000d;
         lastNanos = nowNanos;
         if (phase != Phase.MOVING) return;
-        traveledMeters = Math.min(totalMeters, traveledMeters + seconds * speedMps);
-        if (traveledMeters >= totalMeters) phase = Phase.ARRIVED;
+        double distance = seconds * speedMps;
+        if (mode == PlaybackMode.ONCE) {
+            cyclePositionMeters = Math.min(totalMeters, cyclePositionMeters + distance);
+            if (cyclePositionMeters >= totalMeters) phase = Phase.ARRIVED;
+        } else {
+            double cycleMeters = mode == PlaybackMode.PING_PONG ? 2 * totalMeters : totalMeters;
+            cyclePositionMeters = (cyclePositionMeters + distance % cycleMeters) % cycleMeters;
+        }
     }
 
     public static void validateSpeed(double speedKmh) {

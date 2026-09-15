@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.location.LocationManager;
+import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -29,11 +30,14 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import dev.routemock.core.GeoPoint;
+import dev.routemock.core.PlaybackMode;
 import dev.routemock.core.RouteEngine;
 import org.json.JSONException;
 import java.io.ByteArrayInputStream;
@@ -49,21 +53,33 @@ public final class MainActivity extends Activity {
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private DraftStore.Draft draft = DraftStore.empty();
     private WebView map;
-    private TextView status, summary, speedText, details, message;
+    private TextView status, summary, speedText, modeHint, details, message;
     private SeekBar speed;
-    private Button plan, start, pause, stop, restore, clear, undo, coordinate, hold;
+    private RadioGroup modeSelector;
+    private Button plan, start, pause, stop, restore, clear, undo, coordinate, hold, locate;
     private boolean mapReady, planning, startPending;
+    private enum RealAction { LOCATE, PLAN, START }
+    private RealLocationFinder realFinder;
+    private Location realFix;
+    private RealAction realAction;
+    private boolean resumed, awaitingLocationPermission, awaitingRestore, releaseForLocation, autoLocateAttempted, locationFailed;
+    private long restoreDeadline;
+    private MockLocationService.Status restoreStartStatus;
+    private MockLocationService.Status seenStatus = MockLocationService.status;
+    private int routeRevision;
     private long lastPlanTime;
     private String localMessage = "點按地圖加入途經點，或用「座標」輸入。";
     private final Runnable commitSpeed = () -> {
         if (saveDraft() && MockLocationService.status.active()) sendCommand(MockLocationService.SPEED);
     };
     private final Runnable refresh = new Runnable() {
-        @Override public void run() { render(); ui.postDelayed(this, 500); }
+        @Override public void run() { advanceRealLocation(); render(); ui.postDelayed(this, 500); }
     };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        realFinder = new RealLocationFinder(this);
+        autoLocateAttempted = state != null && state.getBoolean("autoLocateAttempted");
         try { draft = DraftStore.load(this); } catch (IOException e) { localMessage = e.getMessage(); }
         buildScreen();
         speed.setProgress((int) Math.round(draft.speedKmh() * 2) - 1);
@@ -71,6 +87,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onResume() {
         super.onResume();
+        resumed = true;
         if (!planning) {
             try {
                 draft = DraftStore.load(this);
@@ -79,15 +96,52 @@ public final class MainActivity extends Activity {
             } catch (IOException e) { localMessage = e.getMessage(); }
         }
         map.onResume();
+        boolean staleFix = realFix==null || SystemClock.elapsedRealtimeNanos()-realFix.getElapsedRealtimeNanos()>RealLocationFinder.MAX_SAMPLE_AGE_NANOS;
+        boolean canRefresh = !autoLocateAttempted || (staleFix
+                && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED);
+        if (canRefresh && !planning && !MockLocationService.status.active()
+                && !MockLocationService.hasPendingCleanup(this)) {
+            autoLocateAttempted = true;
+            requestRealLocation(RealAction.LOCATE, false);
+        }
         ui.removeCallbacks(refresh);
         ui.post(refresh);
     }
     @Override protected void onPause() {
+        resumed = false;
+        if (!awaitingLocationPermission) cancelRealLocation();
         ui.removeCallbacks(refresh);
         map.onPause();
         super.onPause();
     }
+    @Override protected void onStop() {
+        cancelRealLocation();
+        super.onStop();
+    }
+    @Override protected void onSaveInstanceState(Bundle state) {
+        state.putBoolean("autoLocateAttempted", autoLocateAttempted);
+        super.onSaveInstanceState(state);
+    }
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != 8) return;
+        boolean granted = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (realAction == null) {
+            if (granted) {
+                autoLocateAttempted = false;
+                if (resumed && !planning && !MockLocationService.status.active() && !MockLocationService.hasPendingCleanup(this))
+                    requestRealLocation(RealAction.LOCATE, false);
+            }
+            return;
+        }
+        awaitingLocationPermission = false;
+        if (!granted)
+            failRealLocation("請允許精確位置權限，再按「定位」重試。");
+        else advanceRealLocation();
+    }
     @Override protected void onDestroy() {
+        realFinder.cancel();
+        routeRevision++;
         ui.removeCallbacksAndMessages(null);
         network.shutdownNow();
         map.removeJavascriptInterface("RouteMock");
@@ -126,6 +180,8 @@ public final class MainActivity extends Activity {
         TextView title = text("Route Mock", 24, Color.rgb(24,50,44)); title.setTypeface(null, Typeface.BOLD); titles.addView(title);
         status = text("待命", 13, Color.rgb(8,126,120)); status.setContentDescription("行程狀態"); titles.addView(status);
         header.addView(titles, new LinearLayout.LayoutParams(0,-2,1));
+        locate = button("定位", "定位到真實位置", () -> requestRealLocation(RealAction.LOCATE, true));
+        header.addView(locate, new LinearLayout.LayoutParams(dp(60), -2));
         header.addView(button("設定", "開啟設定引導", this::showSetup)); root.addView(header);
         map = new WebView(this); map.setContentDescription("步行路線地圖");
         map.getSettings().setJavaScriptEnabled(true);
@@ -158,18 +214,39 @@ public final class MainActivity extends Activity {
                 }
                 return true;
             }
-            @Override public void onPageFinished(WebView view, String url) { mapReady = true; showDraft(true); }
+            @Override public void onPageFinished(WebView view, String url) {
+                mapReady = true;
+                showDraft(MockLocationService.status.active() || MockLocationService.hasPendingCleanup(MainActivity.this));
+                showRealFix(true);
+            }
         });
         root.addView(map, new LinearLayout.LayoutParams(-1,0,1));
         map.loadUrl("https://routemock.local/map.html");
 
-        ScrollView scroller = new ScrollView(this); scroller.setFillViewport(false);
+        ScrollView scroller = new ScrollView(this); scroller.setFillViewport(false); scroller.setContentDescription("路線設定");
         LinearLayout controls = new LinearLayout(this); controls.setOrientation(LinearLayout.VERTICAL); controls.setPadding(dp(16),dp(8),dp(16),dp(8));
         summary = text("",15,Color.rgb(24,50,44)); summary.setTypeface(null,Typeface.BOLD); controls.addView(summary);
         LinearLayout editRow = row();
         coordinate = button("座標", "輸入座標", this::coordinateDialog); undo = button("撤回", "撤回途經點", this::undo);
-        clear = button("清除", "清除路線", () -> replacePoints(List.of())); plan = button("規劃步行", "規劃步行路線", this::planRoute);
+        clear = button("清除", "清除路線", () -> replacePoints(draft.waypoints().isEmpty()
+                ? List.of() : List.of(draft.waypoints().get(0))));
+        plan = button("規劃步行", "規劃步行路線", this::planRoute);
         addButton(editRow,coordinate); addButton(editRow,undo); addButton(editRow,clear); addButton(editRow,plan); controls.addView(editRow);
+        modeSelector = new RadioGroup(this); modeSelector.setOrientation(LinearLayout.HORIZONTAL);
+        modeSelector.setContentDescription("行走模式");
+        for (PlaybackMode mode : PlaybackMode.values()) {
+            RadioButton option = new RadioButton(this); option.setId(View.generateViewId()); option.setTag(mode);
+            option.setText(modeLabel(mode)); option.setTextSize(13); option.setMinHeight(dp(48));
+            option.setContentDescription("模式：" + modeLabel(mode));
+            modeSelector.addView(option, new RadioGroup.LayoutParams(0, -2, 1));
+            if (mode == draft.mode()) modeSelector.check(option.getId());
+        }
+        modeSelector.setOnCheckedChangeListener((group, id) -> {
+            RadioButton selected = group.findViewById(id);
+            if (selected != null) changeMode((PlaybackMode) selected.getTag());
+        });
+        controls.addView(modeSelector);
+        modeHint = text("",12,Color.rgb(70,88,80)); controls.addView(modeHint);
         speedText = text("",15,Color.rgb(24,50,44)); controls.addView(speedText);
         speed = new SeekBar(this); speed.setMax(59); speed.setContentDescription("移動速度");
         controls.addView(speed, new LinearLayout.LayoutParams(-1, dp(48)));
@@ -177,7 +254,7 @@ public final class MainActivity extends Activity {
             @Override public void onProgressChanged(SeekBar seek, int p, boolean user) {
                 double value=(p+1)/2.0; speedText.setText(String.format(Locale.TAIWAN,"移動速度  %.1f km/h",value));
                 if (user) {
-                    draft = new DraftStore.Draft(draft.waypoints(),draft.route(),value);
+                    draft = new DraftStore.Draft(draft.waypoints(),draft.route(),value,draft.mode());
                     ui.removeCallbacks(commitSpeed);
                     ui.postDelayed(commitSpeed, 250);
                 }
@@ -205,24 +282,41 @@ public final class MainActivity extends Activity {
         setContentView(root);
     }
     private static WebResourceResponse denied() { return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0])); }
-    private boolean editable() { return !planning && !startPending && !MockLocationService.status.active() && !MockLocationService.hasPendingCleanup(this); }
+    private boolean editable() { return !planning && !startPending && realAction == null && !MockLocationService.status.active() && !MockLocationService.hasPendingCleanup(this); }
+    private static String modeLabel(PlaybackMode mode) {
+        return switch (mode) {
+            case ONCE -> "單次";
+            case PING_PONG -> "原路往返";
+            case LOOP -> "閉合循環";
+        };
+    }
+    private void changeMode(PlaybackMode mode) {
+        if (mode == draft.mode() || !editable()) return;
+        routeRevision++;
+        draft = draft.withMode(mode);
+        if (saveDraft()) localMessage = draft.route().isEmpty()
+                ? "模式已變更，請規劃步行路線。" : "模式已變更，可以開始行走。";
+        showDraft(false); render();
+    }
     private void appendPoint(double lat,double lon) {
         if (!editable()) return;
+        if (draft.waypoints().isEmpty()) { toast("請先按「定位」取得目前位置，再加入目的地。"); return; }
         if (draft.waypoints().size()>=8) { toast("最多 8 個途經點"); return; }
         try { List<GeoPoint> points=new ArrayList<>(draft.waypoints()); points.add(new GeoPoint(lat,lon)); replacePoints(points); }
         catch (IllegalArgumentException e) { toast("緯度需在 ±90，經度需在 ±180 之內"); }
     }
     private void replacePoints(List<GeoPoint> points) {
         if (!editable()) return;
-        draft=new DraftStore.Draft(points,List.of(),draft.speedKmh()); saveDraft();
+        routeRevision++;
+        draft=new DraftStore.Draft(points,List.of(),draft.speedKmh(),draft.mode()); saveDraft();
         localMessage=points.isEmpty()?"點按地圖加入途經點，或用「座標」輸入。":"選點已更新；請規劃步行路線，或在最後一點定點。";
         showDraft(false); render();
     }
-    private void undo() { if(!draft.waypoints().isEmpty())replacePoints(draft.waypoints().subList(0,draft.waypoints().size()-1)); }
+    private void undo() { if(draft.waypoints().size()>1)replacePoints(draft.waypoints().subList(0,draft.waypoints().size()-1)); }
     private void coordinateDialog() {
-        EditText input=new EditText(this); input.setSingleLine(true); input.setHint("25.0330, 121.5654"); input.setContentDescription("緯度與經度");
+        EditText input=new EditText(this); input.setSingleLine(true); input.setHint("緯度, 經度"); input.setContentDescription("緯度與經度");
         input.setInputType(InputType.TYPE_CLASS_TEXT); input.setPadding(dp(24),dp(16),dp(24),dp(16));
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("加入座標").setMessage("輸入：緯度, 經度").setView(input).setNegativeButton("取消",null).setPositiveButton("加入",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("加入目的地座標").setMessage("輸入：緯度, 經度。第 1 點使用目前真實位置。").setView(input).setNegativeButton("取消",null).setPositiveButton("加入",null).create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             try { String[] parts=input.getText().toString().trim().split("[,，\\s]+"); if(parts.length!=2)throw new IllegalArgumentException();
                 GeoPoint point=new GeoPoint(Double.parseDouble(parts[0]),Double.parseDouble(parts[1])); appendPoint(point.latitude(),point.longitude()); showDraft(true); dialog.dismiss();
@@ -235,15 +329,121 @@ public final class MainActivity extends Activity {
     }
     private void planRoute() {
         if(!editable() || draft.waypoints().size()<2) return;
+        requestRealLocation(RealAction.PLAN, false);
+    }
+    private void planFromRealFix() {
         if(SystemClock.elapsedRealtime()-lastPlanTime<1500){toast("請稍候再規劃");return;}
+        draft = new DraftStore.Draft(draft.waypoints(), List.of(), draft.speedKmh(), draft.mode());
+        if (!saveDraft()) return;
         lastPlanTime=SystemClock.elapsedRealtime(); planning=true; localMessage="正在規劃步行路線…"; render();
-        List<GeoPoint> points=draft.waypoints();
+        List<GeoPoint> points=draft.waypoints(); PlaybackMode mode=draft.mode();
+        GeoPoint origin = new GeoPoint(realFix.getLatitude(), realFix.getLongitude());
+        float accuracy = realFix.getAccuracy();
+        int revision = ++routeRevision;
         network.execute(() -> {
-            try { List<GeoPoint> route=WalkingRouter.plan(points);
-                ui.post(() -> {if(isDestroyed())return; planning=false;draft=new DraftStore.Draft(points,route,draft.speedKmh());
+            try { List<GeoPoint> route=WalkingRouter.plan(points,mode);
+                if (!RealLocationFinder.nearOrigin(origin, route.get(0), accuracy))
+                    throw new IOException("步行路網起點離目前位置太遠，請靠近可步行路段後重新規劃。");
+                ui.post(() -> {if(isDestroyed() || revision!=routeRevision)return; planning=false;draft=new DraftStore.Draft(points,route,draft.speedKmh(),mode);
                     saveDraft();localMessage="路線已就緒。開始後可切換到其他 App。";showDraft(true);render();});
-            }catch(IOException e){ui.post(() -> {if(isDestroyed())return;planning=false;localMessage=e.getMessage();render();});}
+            }catch(IOException e){ui.post(() -> {if(isDestroyed() || revision!=routeRevision)return;planning=false;localMessage=e.getMessage();render();});}
         });
+    }
+    private void requestRealLocation(RealAction action, boolean mayRelease) {
+        if (planning || startPending || realAction != null) return;
+        autoLocateAttempted = true;
+        locationFailed = false;
+        realAction = action; releaseForLocation = mayRelease;
+        realFix = null; js("clearRealPosition()");
+        localMessage = "正在取得新的真實位置…";
+        advanceRealLocation(); render();
+    }
+    private void advanceRealLocation() {
+        if (!resumed || realAction == null || awaitingLocationPermission || realFinder.isRunning()) return;
+        MockLocationService.Status session = MockLocationService.status;
+        boolean dirty = MockLocationService.hasPendingCleanup(this);
+        if (awaitingRestore) {
+            if (!session.active() && !dirty) awaitingRestore = false;
+            else {
+                if (SystemClock.elapsedRealtime() >= restoreDeadline
+                        || (session != restoreStartStatus && !session.active()))
+                    failRealLocation("模擬定位尚未完成清理，請完成清理後再按「定位」。");
+                return;
+            }
+        }
+        if (session.active() || dirty) {
+            if (!releaseForLocation) { failRealLocation("請先恢復真實定位，再規劃或開始新路線。"); return; }
+            if (!session.active() && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestRealPermission(); return;
+            }
+            if (!session.active() && !MockLocationService.isSelectedMockApp(this)) {
+                failRealLocation("請先重新指定 Route Mock 為模擬位置 App，完成清理後再定位。"); return;
+            }
+            awaitingRestore = true; restoreStartStatus = session;
+            restoreDeadline = SystemClock.elapsedRealtime() + 30_000;
+            localMessage = "正在關閉模擬定位，完成後取得真實位置…";
+            try {
+                if (session.active()) sendCommand(MockLocationService.RELEASE);
+                else startForegroundService(new Intent(this,MockLocationService.class).setAction(MockLocationService.CLEANUP));
+            } catch (RuntimeException e) { failRealLocation("無法恢復真實定位：" + e.getMessage()); }
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestRealPermission(); return;
+        }
+        realFinder.start(this::acceptRealLocation, this::failRealLocation);
+    }
+    private void requestRealPermission() {
+        awaitingLocationPermission = true;
+        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},8);
+    }
+    private void acceptRealLocation(Location location) {
+        if (!resumed || realAction == null) return;
+        if (MockLocationService.status.active() || MockLocationService.hasPendingCleanup(this)) {
+            failRealLocation("模擬定位狀態已改變，請重新按「定位」。"); return;
+        }
+        RealAction action = realAction;
+        realAction = null; awaitingRestore = false;
+        locationFailed = false;
+        realFix = new Location(location);
+        GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
+        boolean moved = action == RealAction.PLAN || draft.waypoints().isEmpty() || draft.route().isEmpty()
+                || !RealLocationFinder.nearOrigin(point,draft.waypoints().get(0),location.getAccuracy());
+        if (moved) {
+            DraftStore.Draft updated = draft.withOrigin(point);
+            if (updated != draft) {
+                draft=updated; routeRevision++;
+                if (!saveDraft()) { showRealFix(true); render(); return; }
+            }
+        }
+        localMessage = String.format(Locale.TAIWAN,"已取得真實位置 · 精度約 %.0f m。第 1 點為起點，點地圖加入目的地。",location.getAccuracy());
+        showDraft(false); showRealFix(true);
+        if (action == RealAction.PLAN && draft.waypoints().size()>=2) planFromRealFix();
+        else if (action == RealAction.START) {
+            if (draft.route().size()<2) localMessage="目前起點已更新，請重新規劃並確認路線後再開始。";
+            else if (!RealLocationFinder.nearOrigin(point,draft.route().get(0),location.getAccuracy())) {
+                draft = new DraftStore.Draft(draft.waypoints(),List.of(),draft.speedKmh(),draft.mode());
+                saveDraft(); showDraft(false);
+                localMessage="路線起點離目前位置太遠，請重新規劃，避免位置跳躍。";
+            } else launchMock(false);
+        }
+        render();
+    }
+    private void failRealLocation(String reason) {
+        realFinder.cancel(); realAction=null; awaitingRestore=false; awaitingLocationPermission=false;
+        locationFailed=true;
+        localMessage=reason; showDraft(true); render(); if (resumed) toast(reason);
+    }
+    private void cancelRealLocation() {
+        if (realAction == null) return;
+        boolean permissionPending = awaitingLocationPermission;
+        realFinder.cancel(); realAction=null; awaitingRestore=false; awaitingLocationPermission=false;
+        if (!permissionPending) autoLocateAttempted=false;
+        localMessage="定位已取消，回到畫面後會重新取得真實位置。";
+    }
+    private void showRealFix(boolean center) {
+        if (realFix==null || MockLocationService.status.active() || MockLocationService.hasPendingCleanup(this)) return;
+        js(String.format(Locale.US,"showRealPosition(%.8f,%.8f,%.2f,%s)",realFix.getLatitude(),realFix.getLongitude(),realFix.getAccuracy(),center));
     }
     private void requestSetupPermissions() {
         String[] permissions = Build.VERSION.SDK_INT >= 33
@@ -263,7 +463,13 @@ public final class MainActivity extends Activity {
         return true;
     }
     private void begin(boolean fixed) {
-        if(!editable() || (fixed?draft.waypoints().isEmpty():draft.route().size()<2) || !preflight() || !saveDraft())return;
+        if(!editable() || (fixed?draft.waypoints().isEmpty():draft.route().size()<2))return;
+        if (!fixed) requestRealLocation(RealAction.START, false);
+        else launchMock(true);
+    }
+    private void launchMock(boolean fixed) {
+        if (!editable() || !preflight() || !saveDraft()) return;
+        realFix=null; js("clearRealPosition()");
         startPending=true;localMessage="正在啟用模擬定位…";render();
         try {startForegroundService(new Intent(this,MockLocationService.class).setAction(fixed?MockLocationService.HOLD:MockLocationService.START));}
         catch(RuntimeException e){startPending=false;localMessage="無法啟動："+e.getMessage();}
@@ -295,6 +501,10 @@ public final class MainActivity extends Activity {
     private void render() {
         if(status==null)return;
         MockLocationService.Status session=MockLocationService.status;
+        if (session != seenStatus) {
+            if (session.phase().equals("ERROR") && !session.active()) localMessage=session.message();
+            seenStatus=session;
+        }
         boolean active=session.active(); boolean dirty=MockLocationService.hasPendingCleanup(this);
         boolean canEdit=editable();
         String phase=switch(session.phase()){
@@ -304,10 +514,25 @@ public final class MainActivity extends Activity {
             case "ERROR" -> "行程發生錯誤"; default -> "待命";
         };
         if(!active&&dirty)phase="中斷 · 需要清理";
+        else if (!active && realAction!=null) phase="取得真實位置中";
+        else if (!active && realFix!=null) phase="已定位 · 真實位置";
+        else if (!active && locationFailed) phase="定位失敗 · 請重試";
         setText(status,phase + (active&&session.platformOnly()?" · 平台定位":""));
         setText(summary,String.format(Locale.TAIWAN,"%d 個途經點%s",draft.waypoints().size(),draft.route().isEmpty()?" · 尚未規劃":String.format(Locale.TAIWAN," · 步行 %.0f m",RouteEngine.lengthMeters(draft.route()))));
         setText(speedText,String.format(Locale.TAIWAN,"移動速度  %.1f km/h",draft.speedKmh()));
-        coordinate.setEnabled(canEdit); clear.setEnabled(canEdit&&!draft.waypoints().isEmpty());undo.setEnabled(canEdit&&!draft.waypoints().isEmpty());
+        for (int i=0;i<modeSelector.getChildCount();i++) {
+            RadioButton option=(RadioButton)modeSelector.getChildAt(i);
+            option.setEnabled(canEdit);
+            if (option.getTag()==draft.mode() && modeSelector.getCheckedRadioButtonId()!=option.getId())
+                modeSelector.check(option.getId());
+        }
+        setText(modeHint,switch(draft.mode()) {
+            case ONCE -> "A → B → C，到達後定點";
+            case PING_PONG -> "A → B → C → B → A，持續往返";
+            case LOOP -> "A → B → C → A，沿步行路線循環";
+        });
+        coordinate.setEnabled(canEdit&&!draft.waypoints().isEmpty()); clear.setEnabled(canEdit&&draft.waypoints().size()>1);undo.setEnabled(canEdit&&draft.waypoints().size()>1);
+        locate.setEnabled(!planning&&!startPending&&realAction==null);setText(locate,realAction==null?"定位":"定位中");
         plan.setEnabled(canEdit&&draft.waypoints().size()>=2);setText(plan,planning?"規劃中…":"規劃步行");
         hold.setEnabled(canEdit&&!draft.waypoints().isEmpty());start.setEnabled(canEdit&&draft.route().size()>=2);
         pause.setEnabled(active&&(session.phase().equals("MOVING")||session.phase().equals("RUNNING")||session.phase().equals("PAUSED")));
@@ -315,12 +540,12 @@ public final class MainActivity extends Activity {
         restore.setEnabled((active&&!session.phase().equals("STOPPING"))||(!active&&dirty));
         String restoreLabel=!active&&dirty?"清理並恢復真實定位":"恢復真實定位";
         setText(restore,restoreLabel); restore.setContentDescription(restoreLabel);
-        speed.setEnabled(!planning&&!startPending&&(!dirty||active));
-        if(session.sample()!=null&&active){RouteEngine.Sample p=session.sample();setText(details,String.format(Locale.TAIWAN,"%.6f, %.6f  ·  %.0f / %.0f m",p.point().latitude(),p.point().longitude(),p.traveledMeters(),p.totalMeters()));
+        speed.setEnabled(!planning&&!startPending&&realAction==null&&(!dirty||active));
+        if(session.sample()!=null&&active){RouteEngine.Sample p=session.sample();setText(details,String.format(Locale.TAIWAN,"%.6f, %.6f  ·  路線位置 %.0f / %.0f m",p.point().latitude(),p.point().longitude(),p.routePositionMeters(),p.totalMeters()));
             js(String.format(Locale.US,"showPosition(%.8f,%.8f)",p.point().latitude(),p.point().longitude()));}
         else {setText(details,"規劃時傳送選點至 OSM 路由服務；圖磚需連線。");js("clearPosition()");}
-        setText(message,(active||dirty||session.phase().equals("ERROR"))&&!session.message().isEmpty()?session.message():localMessage);
-        js("setEditable("+canEdit+")");
+        setText(message,(active||dirty)&&!session.message().isEmpty()?session.message():localMessage);
+        js("setEditable("+(canEdit&&!draft.waypoints().isEmpty())+")");
     }
     private void showDraft(boolean fit) {
         try{js("showDraft("+DraftStore.jsonPoints(draft.waypoints())+","+DraftStore.jsonPoints(draft.route())+","+fit+")");}

@@ -95,6 +95,11 @@ public final class UiDriver extends Instrumentation {
                 progress.putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE,
                         Float.parseFloat(value(arguments, "value", "0")));
                 acted = target.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.getId(), progress);
+            } else if ("scroll-forward".equals(operation) || "scroll-backward".equals(operation)) {
+                boolean scrolled = target.performAction("scroll-forward".equals(operation)
+                        ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
+                result.putBoolean("scrolled", scrolled);
+                acted = true; // Reaching a scroll boundary is a successful no-op dispatch.
             } else {
                 if (target != root) {
                     target.recycle();
@@ -208,6 +213,8 @@ public final class UiDriver extends Instrumentation {
                 .append(" content-desc=\"").append(escape(node.getContentDescription())).append('\"')
                 .append(" resource-id=\"").append(escape(node.getViewIdResourceName())).append('\"')
                 .append(" clickable=\"").append(node.isClickable()).append('\"')
+                .append(" checked=\"").append(node.isChecked()).append('\"')
+                .append(" scrollable=\"").append(node.isScrollable()).append('\"')
                 .append(" enabled=\"").append(node.isEnabled()).append('\"')
                 .append(" bounds=\"").append(boundsToString(bounds)).append("\">");
         for (int index = 0; index < node.getChildCount(); index++) {

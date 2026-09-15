@@ -118,10 +118,10 @@ public final class MockLocationService extends Service {
                     if (draft.waypoints().isEmpty()) throw new IllegalArgumentException("請先選擇定點位置");
                     points = List.of(draft.waypoints().get(draft.waypoints().size() - 1));
                 } else if (points.size() < 2) throw new IllegalArgumentException("請先規劃步行路線");
-                new RouteEngine(points, draft.speedKmh(), SystemClock.elapsedRealtimeNanos()); // Validate before sink mutation.
+                new RouteEngine(points, draft.speedKmh(), draft.mode(), SystemClock.elapsedRealtimeNanos()); // Validate before sink mutation.
                 status = new Status("PREPARING", "正在啟用模擬位置", null, true, false, false);
                 sink.enable();
-                engine = new RouteEngine(points, draft.speedKmh(), SystemClock.elapsedRealtimeNanos());
+                engine = new RouteEngine(points, draft.speedKmh(), draft.mode(), SystemClock.elapsedRealtimeNanos());
                 tick();
                 if (engine != null && !stopping)
                     ticker = worker.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);

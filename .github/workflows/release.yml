@@ -72,8 +72,9 @@ jobs:
           VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: |
           ./gradlew --no-daemon --no-configuration-cache \
-            :core:test :app:lintRelease :app:assembleRelease \
+            :core:test :app:testReleaseUnitTest :app:lintRelease :app:assembleRelease \
             -PreleaseVersionName="$VERSION_NAME" -PreleaseVersionCode="$VERSION_CODE"
+          python3 -m unittest discover -s tools -p 'test_*.py'
 
       - name: Align, sign, and verify APK
         env:

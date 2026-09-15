@@ -8,6 +8,7 @@
 - **Google Play services Location 21.3.0** — 官方 Google SDK，並非本專案開源自有程式。[Google APIs 使用條款](https://developers.google.com/terms)與 SDK 附帶授權適用；其 transitive 依賴由 Gradle 解析。
 - **desugar_jdk_libs 2.1.5** — Google 提供的 Java 標準函式庫相容支援，讓 Android 9 可執行目前使用的較新 Java API。參見[上游原始碼與授權](https://github.com/google/desugar_jdk_libs)、[版本紀錄](https://github.com/google/desugar_jdk_libs/blob/master/CHANGELOG.md)及 [Android 相容 API 清單](https://developer.android.com/studio/write/java11-default-support-table)。
 - **AndroidX、Kotlin／coroutines、Google Play services transitive 依賴** — 來自固定頂層依賴解析，分別保留 Maven artifact 附帶的 LICENSE／NOTICE；可用 Gradle `:app:dependencies --configuration debugRuntimeClasspath` 查看完整樹。不要把「自有版本」解讀為沒有第三方 SDK。
+- **JSON-java（org.json:json:20260522）** — 僅用於 JVM 單元測試的 JSON 處理，不打包到產品 APK。參見[上游專案](https://github.com/stleary/JSON-java)與[授權文件](https://github.com/stleary/JSON-java/blob/master/LICENSE)。
 - **JUnit 4.13.2** — 測試依賴，EPL-1.0；不打包到產品 APK。
 - **Gradle Wrapper 8.13** — Apache-2.0；只用於建置，wrapper script 保留版權聲明。
 
