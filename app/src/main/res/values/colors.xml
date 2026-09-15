@@ -1,0 +1,13 @@
+<resources>
+    <color name="ui_background">#F4F7F6</color>
+    <color name="ui_surface">#FFFFFF</color>
+    <color name="ui_ink">#18322C</color>
+    <color name="ui_muted">#52665F</color>
+    <color name="ui_accent">#087E78</color>
+    <color name="ui_accent_ink">#066B65</color>
+    <color name="ui_accent_soft">#E4F2EF</color>
+    <color name="ui_border">#D8E3DE</color>
+    <color name="ui_disabled">#EDF1EF</color>
+    <color name="ui_disabled_ink">#7A8781</color>
+    <color name="ui_warning">#8C4C20</color>
+</resources>

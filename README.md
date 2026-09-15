@@ -8,11 +8,11 @@ It uses public Android mock-location APIs. Receiving apps can identify and rejec
 
 1. Install the product APK from [Releases](https://github.com/oskuhsiu/gps-emu/releases), or build it below. Release APKs use a **public test signing key**; read the signing notice below.
 2. Enable system location, grant precise-location permission, and select **Route Mock** as the mock-location app in Developer options. Allow notifications for convenient session controls.
-3. Wait for a fresh real location, or press **定位** (Locate). Walking starts from this automatic origin; tap the map or enter coordinates to add up to 7 destinations. Choose 單次 (single trip), 原路往返 (back and forth), or 閉合循環 (closed loop), then plan, review and start. Planning sends the real origin and destinations to the routing service. Speed ranges from 0.5 to 30 km/h. Hold uses the last selected point.
+3. Wait for a fresh real location, or press **定位** (Locate). Walking starts from this automatic origin; tap the map or use the coordinate icon to add up to 7 destinations. Choose 單次 (single trip), 原路往返 (back and forth), or 閉合循環 (closed loop), then plan, review and start. Planning sends the real origin and destinations to the routing service. Speed ranges from 0.5 to 30 km/h. Hold uses the last selected point.
 4. Pause preserves progress for Resume. **Stop walking** holds the last position; **Restore real location** ends mock output. Single-trip arrival holds the endpoint. Pressing **定位** during mock output also releases it before requesting a fresh real position.
 5. If updates stop after switching apps, use Settings → **背景執行設定** to open the app's system settings and allow background activity. See the [background settings FAQ](docs/faq.md).
 
-Planning and starting a walk each require a fresh real-location fix. If the origin has moved beyond the accuracy allowance, the app preserves destinations but clears the route for replanning. Route planning and uncached map tiles need network access; saved geometry can play offline if the fresh-origin check passes. Sessions never restart automatically. See the [FAQ](docs/faq.md) for location accuracy, timeout and verification limits.
+Planning can reuse a validated real fix from the previous 30 seconds; starting a walk requires a new fix after pressing Start. If the origin has moved beyond the accuracy allowance, the app preserves destinations but clears the route for replanning. Route planning and uncached map tiles need network access; saved geometry can play offline if the fresh-origin check passes. Sessions never restart automatically. See the [FAQ](docs/faq.md) for location accuracy, timeout and verification limits.
 
 ## Documentation
 

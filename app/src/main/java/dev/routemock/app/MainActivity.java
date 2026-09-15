@@ -6,7 +6,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.location.LocationManager;
@@ -19,6 +18,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.webkit.JavascriptInterface;
@@ -29,6 +29,9 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.GridLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -56,7 +59,9 @@ public final class MainActivity extends Activity {
     private TextView status, summary, speedText, modeHint, details, message;
     private SeekBar speed;
     private RadioGroup modeSelector;
-    private Button plan, start, pause, stop, restore, clear, undo, coordinate, hold, locate;
+    private LinearLayout idleActions, playbackActions;
+    private Button plan, start, pause, stop, restore, hold;
+    private ImageButton locate, coordinate, undo, clear;
     private boolean mapReady, planning, startPending;
     private enum RealAction { LOCATE, PLAN, START }
     private RealLocationFinder realFinder;
@@ -96,7 +101,7 @@ public final class MainActivity extends Activity {
             } catch (IOException e) { localMessage = e.getMessage(); }
         }
         map.onResume();
-        boolean staleFix = realFix==null || SystemClock.elapsedRealtimeNanos()-realFix.getElapsedRealtimeNanos()>RealLocationFinder.MAX_SAMPLE_AGE_NANOS;
+        boolean staleFix = !canReuseRealFix(RealLocationFinder.MAX_SAMPLE_AGE_NANOS);
         boolean canRefresh = !autoLocateAttempted || (staleFix
                 && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED);
         if (canRefresh && !planning && !MockLocationService.status.active()
@@ -149,22 +154,62 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private int color(int resource) { return getColor(resource); }
     private TextView text(String value, int size, int color) {
-        TextView view = new TextView(this); view.setText(value); view.setTextSize(size); view.setTextColor(color); return view;
+        TextView view = new TextView(this); view.setText(value); view.setTextSize(size); view.setTextColor(color);
+        view.setFontFeatureSettings("tnum");
+        return view;
+    }
+    private TextView heading(String value) {
+        TextView view = text(value, 16, color(R.color.ui_ink));
+        view.setTypeface(null, Typeface.BOLD); view.setAccessibilityHeading(true);
+        return view;
+    }
+    private LinearLayout column() {
+        LinearLayout column = new LinearLayout(this); column.setOrientation(LinearLayout.VERTICAL); return column;
     }
     private LinearLayout row() {
-        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); return row;
+        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL); return row;
     }
     private Button button(String title, String locator, Runnable action) {
         Button b = new Button(this); b.setText(title); b.setAllCaps(false); b.setMinHeight(dp(48));
-        b.setTextSize(13); b.setPadding(dp(6), 0, dp(6), 0); b.setContentDescription(locator);
+        b.setMinimumWidth(0); b.setMinWidth(0);
+        b.setTextSize(14); b.setPadding(dp(12), dp(8), dp(12), dp(8)); b.setContentDescription(locator);
+        b.setTypeface(null, Typeface.BOLD); b.setStateListAnimator(null);
+        styleButton(b, R.drawable.ui_button_secondary, R.color.ui_control_text);
         b.setOnClickListener(v -> action.run()); return b;
     }
-    private void addButton(LinearLayout row, Button button) { row.addView(button, new LinearLayout.LayoutParams(0, -2, 1)); }
+    private ImageButton iconButton(int icon, String locator, Runnable action) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(icon); button.setImageTintList(getColorStateList(R.color.ui_control_text));
+        button.setPadding(dp(12),dp(12),dp(12),dp(12));
+        button.setBackgroundResource(R.drawable.ui_button_outline);
+        button.setContentDescription(locator); button.setTooltipText(locator);
+        button.setOnClickListener(v -> action.run()); return button;
+    }
+    private void styleButton(Button button, int background, int foreground) {
+        button.setBackgroundResource(background);
+        button.setTextColor(getColorStateList(foreground));
+    }
+    private void addButton(LinearLayout row, Button button) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
+        if (row.getChildCount() > 0) params.setMarginStart(dp(8));
+        row.addView(button, params);
+    }
+    private void divider(LinearLayout parent) {
+        View line = new View(this); line.setBackgroundColor(color(R.color.ui_border));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(1));
+        params.setMargins(0, dp(8), 0, dp(8)); parent.addView(line, params);
+    }
+    private void addSpaced(LinearLayout parent, View child, int top) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(top); parent.addView(child, params);
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     private void buildScreen() {
-        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.rgb(246,248,246));
+        LinearLayout root = column(); root.setBackgroundColor(color(R.color.ui_background));
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
                 Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
@@ -175,14 +220,17 @@ public final class MainActivity extends Activity {
             }
             return insets;
         });
-        LinearLayout header = row(); header.setPadding(dp(16), dp(8), dp(12), dp(6));
-        LinearLayout titles = new LinearLayout(this); titles.setOrientation(LinearLayout.VERTICAL);
-        TextView title = text("Route Mock", 24, Color.rgb(24,50,44)); title.setTypeface(null, Typeface.BOLD); titles.addView(title);
-        status = text("待命", 13, Color.rgb(8,126,120)); status.setContentDescription("行程狀態"); titles.addView(status);
+        LinearLayout header = row(); header.setPadding(dp(16), dp(4), dp(12), dp(4));
+        LinearLayout titles = column();
+        TextView title = text("Route Mock", 20, color(R.color.ui_ink)); title.setTypeface(null, Typeface.BOLD); titles.addView(title);
+        status = text("待命", 12, color(R.color.ui_accent)); status.setContentDescription("行程狀態"); titles.addView(status);
         header.addView(titles, new LinearLayout.LayoutParams(0,-2,1));
-        locate = button("定位", "定位到真實位置", () -> requestRealLocation(RealAction.LOCATE, true));
-        header.addView(locate, new LinearLayout.LayoutParams(dp(60), -2));
-        header.addView(button("設定", "開啟設定引導", this::showSetup)); root.addView(header);
+        ImageButton settings = iconButton(R.drawable.ui_settings, "開啟設定引導", this::showSetup);
+        settings.setBackgroundResource(R.drawable.ui_button_secondary);
+        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        settingsParams.setMarginStart(dp(8)); header.addView(settings, settingsParams); root.addView(header);
+        LinearLayout body = column(); root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
+        FrameLayout mapPanel = new FrameLayout(this);
         map = new WebView(this); map.setContentDescription("步行路線地圖");
         map.getSettings().setJavaScriptEnabled(true);
         map.getSettings().setAllowFileAccess(false); map.getSettings().setAllowContentAccess(false);
@@ -220,39 +268,82 @@ public final class MainActivity extends Activity {
                 showRealFix(true);
             }
         });
-        root.addView(map, new LinearLayout.LayoutParams(-1,0,1));
+        mapPanel.addView(map, new FrameLayout.LayoutParams(-1, -1));
+        GridLayout mapTools = new GridLayout(this); mapTools.setColumnCount(1); mapTools.setRowCount(4);
+        locate = iconButton(R.drawable.ui_locate, "定位到真實位置", () -> requestRealLocation(RealAction.LOCATE, true));
+        coordinate = iconButton(R.drawable.ui_add_point, "輸入座標", this::coordinateDialog);
+        undo = iconButton(R.drawable.ui_undo, "撤回途經點", this::undo);
+        clear = iconButton(R.drawable.ui_clear, "清除路線", () -> replacePoints(draft.waypoints().isEmpty()
+                ? List.of() : List.of(draft.waypoints().get(0))));
+        for (ImageButton tool : new ImageButton[]{locate,coordinate,undo,clear}) {
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams(); params.width=dp(48); params.height=dp(48);
+            params.setMargins(0,0,dp(6),dp(6)); tool.setElevation(dp(2)); mapTools.addView(tool,params);
+        }
+        FrameLayout.LayoutParams toolsParams = new FrameLayout.LayoutParams(-2,-2,Gravity.TOP | Gravity.END);
+        toolsParams.setMargins(dp(12),dp(12),dp(6),dp(12)); mapPanel.addView(mapTools,toolsParams);
+        mapPanel.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
+            int columns = b-t >= dp(270) ? 1 : 2;
+            if (mapTools.getColumnCount() != columns) {
+                // Expand before reassigning specs, then shrink to the new bounds.
+                mapTools.setColumnCount(2); mapTools.setRowCount(4);
+                for (int i=0;i<mapTools.getChildCount();i++) {
+                    GridLayout.LayoutParams params = (GridLayout.LayoutParams)mapTools.getChildAt(i).getLayoutParams();
+                    params.rowSpec=GridLayout.spec(i/columns); params.columnSpec=GridLayout.spec(i%columns);
+                    mapTools.getChildAt(i).setLayoutParams(params);
+                }
+                mapTools.setRowCount(columns==1?4:2); mapTools.setColumnCount(columns);
+            }
+        });
+        body.addView(mapPanel, new LinearLayout.LayoutParams(-1, 0, 1));
         map.loadUrl("https://routemock.local/map.html");
 
+        LinearLayout inspector = column(); inspector.setBackgroundColor(color(R.color.ui_surface));
         ScrollView scroller = new ScrollView(this); scroller.setFillViewport(false); scroller.setContentDescription("路線設定");
-        LinearLayout controls = new LinearLayout(this); controls.setOrientation(LinearLayout.VERTICAL); controls.setPadding(dp(16),dp(8),dp(16),dp(8));
-        summary = text("",15,Color.rgb(24,50,44)); summary.setTypeface(null,Typeface.BOLD); controls.addView(summary);
-        LinearLayout editRow = row();
-        coordinate = button("座標", "輸入座標", this::coordinateDialog); undo = button("撤回", "撤回途經點", this::undo);
-        clear = button("清除", "清除路線", () -> replacePoints(draft.waypoints().isEmpty()
-                ? List.of() : List.of(draft.waypoints().get(0))));
+        scroller.setClipToPadding(false);
+        LinearLayout controls = column(); controls.setPadding(dp(16),dp(12),dp(16),dp(12));
+        LinearLayout routeHeader = row(); LinearLayout routeTitles = column();
+        routeTitles.addView(heading("路線"));
+        summary = text("",13,color(R.color.ui_muted)); addSpaced(routeTitles, summary, 4);
+        routeHeader.addView(routeTitles, new LinearLayout.LayoutParams(0, -2, 1));
         plan = button("規劃步行", "規劃步行路線", this::planRoute);
-        addButton(editRow,coordinate); addButton(editRow,undo); addButton(editRow,clear); addButton(editRow,plan); controls.addView(editRow);
+        styleButton(plan, R.drawable.ui_button_outline, R.color.ui_control_text);
+        LinearLayout.LayoutParams planParams = new LinearLayout.LayoutParams(dp(108), -2);
+        planParams.setMarginStart(dp(8)); routeHeader.addView(plan, planParams); controls.addView(routeHeader);
+        divider(controls);
+        controls.addView(heading("行走模式"));
         modeSelector = new RadioGroup(this); modeSelector.setOrientation(LinearLayout.HORIZONTAL);
         modeSelector.setContentDescription("行走模式");
         for (PlaybackMode mode : PlaybackMode.values()) {
             RadioButton option = new RadioButton(this); option.setId(View.generateViewId()); option.setTag(mode);
-            option.setText(modeLabel(mode)); option.setTextSize(13); option.setMinHeight(dp(48));
+            option.setText(modeLabel(mode)); option.setTextSize(14); option.setMinHeight(dp(48));
+            option.setButtonDrawable(null); option.setGravity(Gravity.CENTER);
+            option.setPadding(dp(4), dp(8), dp(4), dp(8));
+            option.setBackgroundResource(R.drawable.ui_segment);
+            option.setTextColor(getColorStateList(R.color.ui_segment_text));
             option.setContentDescription("模式：" + modeLabel(mode));
-            modeSelector.addView(option, new RadioGroup.LayoutParams(0, -2, 1));
+            RadioGroup.LayoutParams params = new RadioGroup.LayoutParams(0, -2, 1);
+            if (modeSelector.getChildCount() > 0) params.setMarginStart(dp(4));
+            modeSelector.addView(option, params);
             if (mode == draft.mode()) modeSelector.check(option.getId());
         }
         modeSelector.setOnCheckedChangeListener((group, id) -> {
             RadioButton selected = group.findViewById(id);
             if (selected != null) changeMode((PlaybackMode) selected.getTag());
         });
-        controls.addView(modeSelector);
-        modeHint = text("",12,Color.rgb(70,88,80)); controls.addView(modeHint);
-        speedText = text("",15,Color.rgb(24,50,44)); controls.addView(speedText);
+        addSpaced(controls,modeSelector,6);
+        modeHint = text("",12,color(R.color.ui_muted)); addSpaced(controls,modeHint,4);
+        divider(controls);
+        LinearLayout speedHeader = row(); speedHeader.addView(heading("速度"),new LinearLayout.LayoutParams(0,-2,1));
+        speedText = text("",16,color(R.color.ui_accent)); speedText.setTypeface(null,Typeface.BOLD);
+        speedHeader.addView(speedText); controls.addView(speedHeader);
         speed = new SeekBar(this); speed.setMax(59); speed.setContentDescription("移動速度");
         controls.addView(speed, new LinearLayout.LayoutParams(-1, dp(48)));
+        LinearLayout speedRange = row();
+        speedRange.addView(text("0.5",12,color(R.color.ui_muted)),new LinearLayout.LayoutParams(0,-2,1));
+        speedRange.addView(text("30 km/h",12,color(R.color.ui_muted))); controls.addView(speedRange);
         speed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seek, int p, boolean user) {
-                double value=(p+1)/2.0; speedText.setText(String.format(Locale.TAIWAN,"移動速度  %.1f km/h",value));
+                double value=(p+1)/2.0; speedText.setText(String.format(Locale.TAIWAN,"%.1f km/h",value));
                 if (user) {
                     draft = new DraftStore.Draft(draft.waypoints(),draft.route(),value,draft.mode());
                     ui.removeCallbacks(commitSpeed);
@@ -265,20 +356,48 @@ public final class MainActivity extends Activity {
                 commitSpeed.run();
             }
         });
-        LinearLayout actions = row(); hold = button("定點", "開始定點", () -> begin(true)); start = button("開始行走", "開始行走", () -> begin(false));
-        addButton(actions,hold); addButton(actions,start); controls.addView(actions);
-        LinearLayout playback = row(); pause = button("暫停", "暫停或繼續", () -> sendCommand("PAUSED".equals(MockLocationService.status.phase()) ? MockLocationService.RESUME : MockLocationService.PAUSE));
-        stop = button("停止行走", "停止行走並保持位置", () -> sendCommand(MockLocationService.STOP)); addButton(playback,pause); addButton(playback,stop); controls.addView(playback);
-        restore = button("恢復真實定位", "恢復真實定位", this::restoreOrCleanup); controls.addView(restore);
-        details = text("",12,Color.rgb(70,88,80)); details.setTextIsSelectable(true); controls.addView(details);
-        message = text("",12,Color.rgb(88,100,90)); message.setPadding(0,dp(4),0,0); message.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); controls.addView(message);
-        scroller.addView(controls); root.addView(scroller,new LinearLayout.LayoutParams(-1,dp(320)));
-        // Small or landscape windows can scroll the controls while preserving a usable map.
-        root.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
-            int available=b-t-root.getPaddingTop()-root.getPaddingBottom();
-            int height=Math.min(dp(340),Math.max(dp(150),(int)(available*0.56)));
-            if(scroller.getLayoutParams().height!=height){scroller.getLayoutParams().height=height;scroller.requestLayout();}
-        });
+        message = text("",13,color(R.color.ui_muted)); message.setPadding(dp(12),dp(10),dp(12),dp(10));
+        message.setBackgroundColor(color(R.color.ui_background));
+        message.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); addSpaced(controls,message,14);
+        details = text("",12,color(R.color.ui_muted)); details.setTextIsSelectable(true); addSpaced(controls,details,8);
+        scroller.addView(controls); inspector.addView(scroller,new LinearLayout.LayoutParams(-1,dp(290)));
+
+        // Session commands stay reachable while the route settings scroll.
+        LinearLayout footer = column(); footer.setPadding(dp(16),dp(8),dp(16),dp(10));
+        idleActions = row(); hold = button("定點", "開始定點", () -> begin(true)); start = button("開始行走", "開始行走", () -> begin(false));
+        styleButton(start, R.drawable.ui_button_primary, R.color.ui_button_text);
+        addButton(idleActions,hold); addButton(idleActions,start); footer.addView(idleActions);
+        playbackActions = row(); pause = button("暫停", "暫停或繼續", () -> sendCommand("PAUSED".equals(MockLocationService.status.phase()) ? MockLocationService.RESUME : MockLocationService.PAUSE));
+        styleButton(pause, R.drawable.ui_button_primary, R.color.ui_button_text);
+        stop = button("停止行走", "停止行走並保持位置", () -> sendCommand(MockLocationService.STOP));
+        addButton(playbackActions,pause); addButton(playbackActions,stop); footer.addView(playbackActions);
+        restore = button("恢復真實定位", "恢復真實定位", this::restoreOrCleanup);
+        styleButton(restore, R.drawable.ui_button_outline, R.color.ui_control_text); addSpaced(footer,restore,8);
+        View footerBorder = new View(this); footerBorder.setBackgroundColor(color(R.color.ui_border));
+        inspector.addView(footerBorder, new LinearLayout.LayoutParams(-1,dp(1))); inspector.addView(footer);
+        body.addView(inspector, new LinearLayout.LayoutParams(-1, -2));
+        // Use side-by-side panes in wide windows; keep long settings scrollable at large font sizes.
+        Runnable adaptLayout = () -> {
+            int available = body.getHeight();
+            if (available == 0) return;
+            boolean wide = body.getWidth() > available;
+            int orientation = wide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL;
+            if (body.getOrientation() != orientation) {
+                body.setOrientation(orientation);
+                mapPanel.setLayoutParams(new LinearLayout.LayoutParams(wide?0:-1,wide?-1:0,1));
+                inspector.setLayoutParams(new LinearLayout.LayoutParams(wide?0:-1,wide?-1:-2,wide?1:0));
+            }
+            int mapAllowance = Math.max(dp(120), available-footer.getMeasuredHeight()-dp(181));
+            int height = wide ? 0 : Math.min(mapAllowance,
+                    Math.min(dp(296),Math.max(dp(120),Math.round(available*0.50f))));
+            LinearLayout.LayoutParams params = (LinearLayout.LayoutParams)scroller.getLayoutParams();
+            float weight = wide ? 1 : 0;
+            if (params.height != height || params.weight != weight) {
+                params.height=height; params.weight=weight; scroller.setLayoutParams(params);
+            }
+        };
+        body.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> adaptLayout.run());
+        footer.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> adaptLayout.run());
         setContentView(root);
     }
     private static WebResourceResponse denied() { return new WebResourceResponse("text/plain","UTF-8",new ByteArrayInputStream(new byte[0])); }
@@ -354,9 +473,21 @@ public final class MainActivity extends Activity {
         autoLocateAttempted = true;
         locationFailed = false;
         realAction = action; releaseForLocation = mayRelease;
+        long reuseAge = action==RealAction.PLAN ? RealLocationFinder.MAX_PLANNING_AGE_NANOS
+                : RealLocationFinder.MAX_SAMPLE_AGE_NANOS;
+        if (action!=RealAction.START && canReuseRealFix(reuseAge)) {
+            acceptRealLocation(new Location(realFix)); return;
+        }
         realFix = null; js("clearRealPosition()");
         localMessage = "正在取得新的真實位置…";
         advanceRealLocation(); render();
+    }
+    private boolean canReuseRealFix(long maxAgeNanos) {
+        return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
+                && getSystemService(LocationManager.class).isLocationEnabled()
+                && !MockLocationService.status.active() && !MockLocationService.hasPendingCleanup(this)
+                && RealLocationFinder.isUsableLocation(realFix, MockLocationService.realLocationNotBeforeNanos,
+                        SystemClock.elapsedRealtimeNanos(), maxAgeNanos);
     }
     private void advanceRealLocation() {
         if (!resumed || realAction == null || awaitingLocationPermission || realFinder.isRunning()) return;
@@ -391,7 +522,11 @@ public final class MainActivity extends Activity {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestRealPermission(); return;
         }
-        realFinder.start(this::acceptRealLocation, this::failRealLocation);
+        if (!getSystemService(LocationManager.class).isLocationEnabled()) {
+            failRealLocation("請先開啟手機定位，再重新定位。"); return;
+        }
+        realFinder.start(realAction==RealAction.START, MockLocationService.realLocationNotBeforeNanos,
+                this::acceptRealLocation, this::failRealLocation);
     }
     private void requestRealPermission() {
         awaitingLocationPermission = true;
@@ -402,7 +537,17 @@ public final class MainActivity extends Activity {
         if (MockLocationService.status.active() || MockLocationService.hasPendingCleanup(this)) {
             failRealLocation("模擬定位狀態已改變，請重新按「定位」。"); return;
         }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED
+                || !getSystemService(LocationManager.class).isLocationEnabled()) {
+            failRealLocation("定位權限或系統定位已關閉，請開啟後重試。"); return;
+        }
         RealAction action = realAction;
+        long maxAge = action==RealAction.PLAN ? RealLocationFinder.MAX_PLANNING_AGE_NANOS
+                : RealLocationFinder.MAX_SAMPLE_AGE_NANOS;
+        if (!RealLocationFinder.isUsableLocation(location,MockLocationService.realLocationNotBeforeNanos,
+                SystemClock.elapsedRealtimeNanos(),maxAge)) {
+            failRealLocation("位置已過期，請重新定位。"); return;
+        }
         realAction = null; awaitingRestore = false;
         locationFailed = false;
         realFix = new Location(location);
@@ -506,6 +651,7 @@ public final class MainActivity extends Activity {
             seenStatus=session;
         }
         boolean active=session.active(); boolean dirty=MockLocationService.hasPendingCleanup(this);
+        if ((active||dirty) && realFix!=null) { realFix=null; js("clearRealPosition()"); }
         boolean canEdit=editable();
         String phase=switch(session.phase()){
             case "PREPARING" -> "準備中"; case "MOVING","RUNNING" -> "行走中"; case "PAUSED" -> "已暫停 · 維持定點";
@@ -515,14 +661,18 @@ public final class MainActivity extends Activity {
         };
         if(!active&&dirty)phase="中斷 · 需要清理";
         else if (!active && realAction!=null) phase="取得真實位置中";
+        else if (!active && planning) phase="規劃步行路線中";
         else if (!active && realFix!=null) phase="已定位 · 真實位置";
         else if (!active && locationFailed) phase="定位失敗 · 請重試";
         setText(status,phase + (active&&session.platformOnly()?" · 平台定位":""));
         setText(summary,String.format(Locale.TAIWAN,"%d 個途經點%s",draft.waypoints().size(),draft.route().isEmpty()?" · 尚未規劃":String.format(Locale.TAIWAN," · 步行 %.0f m",RouteEngine.lengthMeters(draft.route()))));
-        setText(speedText,String.format(Locale.TAIWAN,"移動速度  %.1f km/h",draft.speedKmh()));
+        setText(speedText,String.format(Locale.TAIWAN,"%.1f km/h",draft.speedKmh()));
         for (int i=0;i<modeSelector.getChildCount();i++) {
             RadioButton option=(RadioButton)modeSelector.getChildAt(i);
             option.setEnabled(canEdit);
+            boolean selected = option.getTag()==draft.mode();
+            setText(option,(selected?"✓ ":"")+modeLabel((PlaybackMode)option.getTag()));
+            option.setTypeface(null,selected?Typeface.BOLD:Typeface.NORMAL);
             if (option.getTag()==draft.mode() && modeSelector.getCheckedRadioButtonId()!=option.getId())
                 modeSelector.check(option.getId());
         }
@@ -531,8 +681,14 @@ public final class MainActivity extends Activity {
             case PING_PONG -> "A → B → C → B → A，持續往返";
             case LOOP -> "A → B → C → A，沿步行路線循環";
         });
+        idleActions.setVisibility(active||dirty?View.GONE:View.VISIBLE);
+        playbackActions.setVisibility(active?View.VISIBLE:View.GONE);
+        restore.setVisibility(active||dirty?View.VISIBLE:View.GONE);
+        status.setTextColor(color((dirty&&!active)||locationFailed||session.phase().equals("ERROR")
+                ? R.color.ui_warning : R.color.ui_accent));
         coordinate.setEnabled(canEdit&&!draft.waypoints().isEmpty()); clear.setEnabled(canEdit&&draft.waypoints().size()>1);undo.setEnabled(canEdit&&draft.waypoints().size()>1);
-        locate.setEnabled(!planning&&!startPending&&realAction==null);setText(locate,realAction==null?"定位":"定位中");
+        locate.setEnabled(!planning&&!startPending&&realAction==null);
+        locate.setTooltipText(realAction==null?"定位到真實位置":"正在取得真實位置");
         plan.setEnabled(canEdit&&draft.waypoints().size()>=2);setText(plan,planning?"規劃中…":"規劃步行");
         hold.setEnabled(canEdit&&!draft.waypoints().isEmpty());start.setEnabled(canEdit&&draft.route().size()>=2);
         pause.setEnabled(active&&(session.phase().equals("MOVING")||session.phase().equals("RUNNING")||session.phase().equals("PAUSED")));

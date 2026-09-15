@@ -8,6 +8,8 @@ import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.KeyEvent;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /**
@@ -78,6 +80,7 @@ public final class UiDriver extends Instrumentation {
                 finishWithError(result, "Missing exact locator label");
                 return;
             }
+            boolean mapGesture = "pan-map".equals(operation) || "pinch-map".equals(operation);
             AccessibilityNodeInfo target = findExact(root, label);
             if (target == null) {
                 root.recycle();
@@ -86,7 +89,9 @@ public final class UiDriver extends Instrumentation {
             }
 
             boolean acted;
-            if (OPERATION_CLICK.equals(operation)) {
+            if (mapGesture) {
+                acted = gestureMap(target, operation, value(arguments, "value", "in"));
+            } else if (OPERATION_CLICK.equals(operation)) {
                 acted = clickNodeOrClickableParent(target);
             } else if (OPERATION_TEXT.equals(operation)) {
                 acted = setText(target, value(arguments, "value", ""));
@@ -166,6 +171,122 @@ public final class UiDriver extends Instrumentation {
             child.recycle();
         }
         return null;
+    }
+
+    private static Rect mapBounds(AccessibilityNodeInfo node) {
+        Rect bounds = new Rect();
+        boolean labeledMap = "步行路線地圖".equals(stringValue(node.getContentDescription()))
+                || "步行路線地圖".equals(stringValue(node.getText()));
+        boolean nativeMap = "android.webkit.WebView".equals(stringValue(node.getClassName()));
+        if (!labeledMap || (!nativeMap && !"map".equals(stringValue(node.getViewIdResourceName())))
+                || !node.isVisibleToUser() || !node.isEnabled()) {
+            return bounds;
+        }
+        node.getBoundsInScreen(bounds);
+        AccessibilityNodeInfo current = node;
+        try {
+            while (current != null) {
+                if ("android.webkit.WebView".equals(stringValue(current.getClassName()))) {
+                    Rect webBounds = new Rect();
+                    current.getBoundsInScreen(webBounds);
+                    if (!current.isVisibleToUser() || !current.isEnabled() || !bounds.intersect(webBounds)) {
+                        bounds.setEmpty();
+                    }
+                    return bounds;
+                }
+                AccessibilityNodeInfo parent = current.getParent();
+                if (current != node) {
+                    current.recycle();
+                }
+                current = parent;
+            }
+            bounds.setEmpty();
+            return bounds;
+        } finally {
+            if (current != null && current != node) {
+                current.recycle();
+            }
+        }
+    }
+
+    private boolean gestureMap(AccessibilityNodeInfo node, String operation, String direction) {
+        boolean pinch = "pinch-map".equals(operation);
+        if (pinch && !"in".equals(direction) && !"out".equals(direction)) {
+            throw new IllegalArgumentException("pinch-map value must be in or out");
+        }
+        Rect bounds = mapBounds(node);
+        if (bounds.isEmpty()) {
+            return false;
+        }
+        UiAutomation automation = getUiAutomation();
+        long downTime = SystemClock.uptimeMillis();
+        float y = bounds.exactCenterY();
+        float initialRadius = "out".equals(direction) ? .25f : .12f;
+        float finalRadius = "out".equals(direction) ? .12f : .25f;
+        float x = bounds.left + bounds.width() * (pinch ? .5f - initialRadius : .4f);
+        float secondX = bounds.left + bounds.width() * (.5f + initialRadius);
+        int pointerCount = 1;
+        boolean completed = false;
+        try {
+            if (!injectTouch(automation, downTime, MotionEvent.ACTION_DOWN, 1, x, secondX, y)) {
+                return false;
+            }
+            if (pinch) {
+                pointerCount = 2;
+                if (!injectTouch(automation, downTime, MotionEvent.ACTION_POINTER_DOWN
+                        | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, x, secondX, y)) {
+                    return false;
+                }
+            }
+            for (int step = 1; step <= 20; step++) {
+                SystemClock.sleep(20L);
+                float fraction = step / 20f;
+                float radius = initialRadius + (finalRadius - initialRadius) * fraction;
+                x = bounds.left + bounds.width() * (pinch ? .5f - radius : .4f + .2f * fraction);
+                secondX = bounds.left + bounds.width() * (.5f + radius);
+                if (!injectTouch(automation, downTime, MotionEvent.ACTION_MOVE,
+                        pointerCount, x, secondX, y)) {
+                    return false;
+                }
+            }
+            if (pinch) {
+                if (!injectTouch(automation, downTime, MotionEvent.ACTION_POINTER_UP
+                        | (1 << MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, x, secondX, y)) {
+                    return false;
+                }
+                pointerCount = 1;
+            }
+            completed = injectTouch(automation, downTime, MotionEvent.ACTION_UP, 1, x, secondX, y);
+            return completed;
+        } finally {
+            if (!completed) {
+                injectTouch(automation, downTime, MotionEvent.ACTION_CANCEL, pointerCount, x, secondX, y);
+            }
+        }
+    }
+
+    private static boolean injectTouch(UiAutomation automation, long downTime, int action,
+            int pointerCount, float x, float secondX, float y) {
+        MotionEvent.PointerProperties[] properties = new MotionEvent.PointerProperties[pointerCount];
+        MotionEvent.PointerCoords[] coordinates = new MotionEvent.PointerCoords[pointerCount];
+        for (int index = 0; index < pointerCount; index++) {
+            properties[index] = new MotionEvent.PointerProperties();
+            properties[index].id = index;
+            properties[index].toolType = MotionEvent.TOOL_TYPE_FINGER;
+            coordinates[index] = new MotionEvent.PointerCoords();
+            coordinates[index].x = index == 0 ? x : secondX;
+            coordinates[index].y = y;
+            coordinates[index].pressure = 1f;
+            coordinates[index].size = 1f;
+        }
+        MotionEvent event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                pointerCount, properties, coordinates, 0, 0, 1f, 1f, 0, 0,
+                InputDevice.SOURCE_TOUCHSCREEN, 0);
+        try {
+            return automation.injectInputEvent(event, true);
+        } finally {
+            event.recycle();
+        }
     }
 
     private static boolean clickNodeOrClickableParent(AccessibilityNodeInfo node) {

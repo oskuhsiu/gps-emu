@@ -33,6 +33,8 @@ public final class MockLocationService extends Service {
     public record Status(String phase, String message, RouteEngine.Sample sample,
                          boolean active, boolean needsCleanup, boolean platformOnly) {}
     public static volatile Status status = new Status("STOPPED", "尚未開始", null, false, false, false);
+    // Process-wide barrier: Activity recreation must not reuse a pre-cleanup fix.
+    static volatile long realLocationNotBeforeNanos;
     private static final String CHANNEL = "mock-session";
     private static final int NOTIFICATION = 10;
     private final ScheduledExecutorService worker = Executors.newSingleThreadScheduledExecutor();
@@ -193,6 +195,7 @@ public final class MockLocationService extends Service {
             finishStop();
             return;
         }
+        realLocationNotBeforeNanos = SystemClock.elapsedRealtimeNanos();
         status = new Status(stopError ? "ERROR" : "STOPPED", stopMessage, status.sample(),
                 false, hasPendingCleanup(this), sink.platformOnly());
         finishStop();

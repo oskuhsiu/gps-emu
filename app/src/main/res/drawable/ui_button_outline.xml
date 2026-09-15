@@ -1,0 +1,9 @@
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#22087E78">
+    <item>
+        <selector>
+            <item android:state_enabled="false"><shape android:shape="rectangle"><solid android:color="@color/ui_disabled" /><corners android:radius="12dp" /><stroke android:width="1dp" android:color="@color/ui_border" /></shape></item>
+            <item android:state_focused="true"><shape android:shape="rectangle"><solid android:color="@color/ui_accent_soft" /><corners android:radius="12dp" /><stroke android:width="1dp" android:color="@color/ui_accent" /></shape></item>
+            <item><shape android:shape="rectangle"><solid android:color="@color/ui_surface" /><corners android:radius="12dp" /><stroke android:width="1dp" android:color="#8ABCB1" /></shape></item>
+        </selector>
+    </item>
+</ripple>

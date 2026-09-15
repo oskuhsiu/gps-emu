@@ -1,5 +1,5 @@
 'use strict';
-const map=L.map('map',{zoomControl:true}).setView([0,0],2);
+const map=L.map('map',{zoomControl:false}).setView([0,0],2);
 const tiles=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> | <a href="https://www.openstreetmap.org/fixthemap">修正地圖</a><br>步行路由：FOSSGIS / OSRM'}).addTo(map);
 tiles.on('tileerror',()=>{document.getElementById('tile-error').hidden=false});
 tiles.on('tileload',()=>{document.getElementById('tile-error').hidden=true});

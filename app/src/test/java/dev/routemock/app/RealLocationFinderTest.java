@@ -35,6 +35,42 @@ public class RealLocationFinderTest {
             assertFalse(usable(false, 25, 121, true, accuracy, NOW));
     }
 
+    @Test public void planningReuseAllowsThirtySecondsButNotOlderSamples() {
+        long sample = REQUEST;
+        long limit = RealLocationFinder.MAX_PLANNING_AGE_NANOS;
+        assertTrue(RealLocationFinder.isUsableSample(false, 25, 121, true, 50,
+                sample, 0, sample + limit, limit));
+        assertFalse(RealLocationFinder.isUsableSample(false, 25, 121, true, 50,
+                sample, 0, sample + limit + 1, limit));
+        assertFalse(RealLocationFinder.isUsableSample(false, 25, 121, true, 50,
+                sample, 0, sample + limit));
+        assertFalse(RealLocationFinder.isUsableSample(false, 25, 121, true, 50,
+                sample, 0, sample, -1));
+    }
+
+    @Test public void cacheAndFreshRequestsRespectCleanupAndRequestBarriers() {
+        long cleanup = REQUEST - 2_000_000_000L;
+        long cacheFloor = RealLocationFinder.minimumSampleTime(false, cleanup, REQUEST);
+        assertEquals(cleanup, cacheFloor);
+        assertTrue(RealLocationFinder.isUsableSample(false, 25, 121, true, 5,
+                cleanup, cacheFloor, NOW));
+        assertFalse(RealLocationFinder.isUsableSample(false, 25, 121, true, 5,
+                cleanup - 1, cacheFloor, NOW));
+        long freshFloor = RealLocationFinder.minimumSampleTime(true, cleanup, REQUEST);
+        assertEquals(REQUEST, freshFloor);
+        assertFalse(RealLocationFinder.isUsableSample(false, 25, 121, true, 5,
+                REQUEST - 1, freshFloor, NOW));
+        assertTrue(RealLocationFinder.isUsableSample(false, 25, 121, true, 5,
+                REQUEST, freshFloor, NOW));
+        assertEquals(NOW, RealLocationFinder.minimumSampleTime(true, NOW, REQUEST));
+        assertEquals(0, RealLocationFinder.minimumSampleTime(false, 0, REQUEST));
+        assertEquals(10_000, RealLocationFinder.maxUpdateAgeMillis(false, 0, REQUEST));
+        assertEquals(2_000, RealLocationFinder.maxUpdateAgeMillis(false, cleanup, REQUEST));
+        assertEquals(0, RealLocationFinder.maxUpdateAgeMillis(false, REQUEST, REQUEST));
+        assertEquals(0, RealLocationFinder.maxUpdateAgeMillis(false, NOW, REQUEST));
+        assertEquals(0, RealLocationFinder.maxUpdateAgeMillis(true, 0, REQUEST));
+    }
+
     @Test public void originToleranceHasTenMeterFloorAndUsesValidAccuracy() {
         GeoPoint origin = new GeoPoint(0, 0);
         GeoPoint fiveMeters = new GeoPoint(.000045, 0);
