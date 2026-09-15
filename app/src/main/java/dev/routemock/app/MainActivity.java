@@ -12,6 +12,7 @@ import android.graphics.Typeface;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -50,7 +51,7 @@ public final class MainActivity extends Activity {
     private WebView map;
     private TextView status, summary, speedText, details, message;
     private SeekBar speed;
-    private Button plan, start, pause, stop, clear, undo, coordinate, hold;
+    private Button plan, start, pause, stop, restore, clear, undo, coordinate, hold;
     private boolean mapReady, planning, startPending;
     private long lastPlanTime;
     private String localMessage = "點按地圖加入途經點，或用「座標」輸入。";
@@ -111,8 +112,14 @@ public final class MainActivity extends Activity {
     private void buildScreen() {
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(Color.rgb(246,248,246));
         root.setOnApplyWindowInsetsListener((v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom); return insets;
+            if (Build.VERSION.SDK_INT >= 30) {
+                Insets bars = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            } else {
+                v.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                        insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            }
+            return insets;
         });
         LinearLayout header = row(); header.setPadding(dp(16), dp(8), dp(12), dp(6));
         LinearLayout titles = new LinearLayout(this); titles.setOrientation(LinearLayout.VERTICAL);
@@ -164,7 +171,8 @@ public final class MainActivity extends Activity {
         clear = button("清除", "清除路線", () -> replacePoints(List.of())); plan = button("規劃步行", "規劃步行路線", this::planRoute);
         addButton(editRow,coordinate); addButton(editRow,undo); addButton(editRow,clear); addButton(editRow,plan); controls.addView(editRow);
         speedText = text("",15,Color.rgb(24,50,44)); controls.addView(speedText);
-        speed = new SeekBar(this); speed.setMax(59); speed.setMinHeight(dp(48)); speed.setContentDescription("移動速度"); controls.addView(speed);
+        speed = new SeekBar(this); speed.setMax(59); speed.setContentDescription("移動速度");
+        controls.addView(speed, new LinearLayout.LayoutParams(-1, dp(48)));
         speed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seek, int p, boolean user) {
                 double value=(p+1)/2.0; speedText.setText(String.format(Locale.TAIWAN,"移動速度  %.1f km/h",value));
@@ -183,7 +191,8 @@ public final class MainActivity extends Activity {
         LinearLayout actions = row(); hold = button("定點", "開始定點", () -> begin(true)); start = button("開始行走", "開始行走", () -> begin(false));
         addButton(actions,hold); addButton(actions,start); controls.addView(actions);
         LinearLayout playback = row(); pause = button("暫停", "暫停或繼續", () -> sendCommand("PAUSED".equals(MockLocationService.status.phase()) ? MockLocationService.RESUME : MockLocationService.PAUSE));
-        stop = button("停止", "停止並清理", this::stopOrCleanup); addButton(playback,pause); addButton(playback,stop); controls.addView(playback);
+        stop = button("停止行走", "停止行走並保持位置", () -> sendCommand(MockLocationService.STOP)); addButton(playback,pause); addButton(playback,stop); controls.addView(playback);
+        restore = button("恢復真實定位", "恢復真實定位", this::restoreOrCleanup); controls.addView(restore);
         details = text("",12,Color.rgb(70,88,80)); details.setTextIsSelectable(true); controls.addView(details);
         message = text("",12,Color.rgb(88,100,90)); message.setPadding(0,dp(4),0,0); message.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); controls.addView(message);
         scroller.addView(controls); root.addView(scroller,new LinearLayout.LayoutParams(-1,dp(320)));
@@ -236,9 +245,15 @@ public final class MainActivity extends Activity {
             }catch(IOException e){ui.post(() -> {if(isDestroyed())return;planning=false;localMessage=e.getMessage();render();});}
         });
     }
+    private void requestSetupPermissions() {
+        String[] permissions = Build.VERSION.SDK_INT >= 33
+                ? new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.POST_NOTIFICATIONS}
+                : new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION};
+        requestPermissions(permissions, 7);
+    }
     private boolean preflight() {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
-            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.POST_NOTIFICATIONS},7);
+            requestSetupPermissions();
             localMessage="允許位置權限後，再按一次開始。";return false;
         }
         if(!getSystemService(LocationManager.class).isLocationEnabled()){
@@ -258,18 +273,23 @@ public final class MainActivity extends Activity {
         if(!MockLocationService.status.active())return;
         startService(new Intent(this,MockLocationService.class).setAction(action).putExtra("speedKmh",draft.speedKmh()));
     }
-    private void stopOrCleanup() {
-        if(MockLocationService.status.active())sendCommand(MockLocationService.STOP);
+    private void restoreOrCleanup() {
+        if(MockLocationService.status.active())sendCommand(MockLocationService.RELEASE);
         else if(MockLocationService.hasPendingCleanup(this) && preflight()){
             try{startForegroundService(new Intent(this,MockLocationService.class).setAction(MockLocationService.CLEANUP));}
             catch(RuntimeException e){localMessage="清理無法啟動："+e.getMessage();}
         }
     }
     private void showSetup() {
+        LinearLayout settings = new LinearLayout(this); settings.setOrientation(LinearLayout.VERTICAL);
+        settings.setPadding(dp(20),0,dp(20),0);
+        settings.addView(button("背景執行設定", "背景執行設定", () -> startActivity(
+                new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:"+getPackageName())))));
         new AlertDialog.Builder(this).setTitle("設定模擬定位")
-                .setMessage("1. 在系統「關於手機」連按版本號碼，啟用開發人員選項。\n2. 在「選取模擬位置應用程式」選 Route Mock。\n3. 開啟系統定位，允許本 App 的精確位置權限。\n\n本 App 使用官方 mock 定位，接收 App 可辨識並拒絕；Pokémon GO／Pikmin 相容性未驗證。\n\n步行規劃會把選取座標送到 routing.openstreetmap.de；地圖來自 OpenStreetMap。下載完成的路線可離線行走。")
+                .setMessage("1. 在系統「關於手機」連按版本號碼，啟用開發人員選項。\n2. 在「選取模擬位置應用程式」選 Route Mock。\n3. 開啟系統定位，允許本 App 的精確位置權限。\n\n即使有前景通知，手機仍可能限制背景執行。若切換 App 後位置停止更新，請到本 App 的系統資訊頁，OPPO 可在「耗電管理」開啟「允許完全背景行為」；其他品牌可能稱為「允許背景活動」或「不限制電池用量」，名稱與入口依手機而異。「背景執行設定」會開啟 App 資訊頁。\n\n本 App 使用官方 mock 定位，接收 App 可辨識並拒絕；Pokémon GO／Pikmin 相容性未驗證。\n\n步行規劃會把選取座標送到 routing.openstreetmap.de；地圖來自 OpenStreetMap。下載完成的路線可離線行走。")
+                .setView(settings)
                 .setPositiveButton("開發人員選項",(d,w)->{try{startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));}catch(RuntimeException e){startActivity(new Intent(Settings.ACTION_SETTINGS));}})
-                .setNeutralButton("位置權限",(d,w)->requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.POST_NOTIFICATIONS},7))
+                .setNeutralButton("位置權限",(d,w)->requestSetupPermissions())
                 .setNegativeButton("關閉",null).show();
     }
     private void render() {
@@ -280,6 +300,7 @@ public final class MainActivity extends Activity {
         String phase=switch(session.phase()){
             case "PREPARING" -> "準備中"; case "MOVING","RUNNING" -> "行走中"; case "PAUSED" -> "已暫停 · 維持定點";
             case "HOLDING" -> "定點中"; case "ARRIVED" -> "已到達 · 維持定點"; case "STOPPING" -> "正在停止與清理";
+            case "STOPPED" -> active?"已停止行走 · 維持定點":"待命";
             case "ERROR" -> "行程發生錯誤"; default -> "待命";
         };
         if(!active&&dirty)phase="中斷 · 需要清理";
@@ -290,7 +311,10 @@ public final class MainActivity extends Activity {
         plan.setEnabled(canEdit&&draft.waypoints().size()>=2);setText(plan,planning?"規劃中…":"規劃步行");
         hold.setEnabled(canEdit&&!draft.waypoints().isEmpty());start.setEnabled(canEdit&&draft.route().size()>=2);
         pause.setEnabled(active&&(session.phase().equals("MOVING")||session.phase().equals("RUNNING")||session.phase().equals("PAUSED")));
-        setText(pause,session.phase().equals("PAUSED")?"繼續":"暫停");stop.setEnabled(active||dirty);setText(stop,!active&&dirty?"清理中斷行程":"停止");
+        setText(pause,session.phase().equals("PAUSED")?"繼續":"暫停"); stop.setEnabled(pause.isEnabled());
+        restore.setEnabled((active&&!session.phase().equals("STOPPING"))||(!active&&dirty));
+        String restoreLabel=!active&&dirty?"清理並恢復真實定位":"恢復真實定位";
+        setText(restore,restoreLabel); restore.setContentDescription(restoreLabel);
         speed.setEnabled(!planning&&!startPending&&(!dirty||active));
         if(session.sample()!=null&&active){RouteEngine.Sample p=session.sample();setText(details,String.format(Locale.TAIWAN,"%.6f, %.6f  ·  %.0f / %.0f m",p.point().latitude(),p.point().longitude(),p.traveledMeters(),p.totalMeters()));
             js(String.format(Locale.US,"showPosition(%.8f,%.8f)",p.point().latitude(),p.point().longitude()));}

@@ -6,6 +6,7 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.location.provider.ProviderProperties;
 import android.os.SystemClock;
+import android.os.Build;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -72,11 +73,16 @@ final class MockSink {
         }
         for (String provider : new String[]{LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER}) {
             mark(provider, true);
-            ProviderProperties properties = new ProviderProperties.Builder()
-                    .setHasAltitudeSupport(true).setHasSpeedSupport(true).setHasBearingSupport(true)
-                    .setPowerUsage(ProviderProperties.POWER_USAGE_LOW)
-                    .setAccuracy(ProviderProperties.ACCURACY_FINE).build();
-            manager.addTestProvider(provider, properties);
+            if (Build.VERSION.SDK_INT >= 31) {
+                ProviderProperties properties = new ProviderProperties.Builder()
+                        .setHasAltitudeSupport(true).setHasSpeedSupport(true).setHasBearingSupport(true)
+                        .setPowerUsage(ProviderProperties.POWER_USAGE_LOW)
+                        .setAccuracy(ProviderProperties.ACCURACY_FINE).build();
+                manager.addTestProvider(provider, properties);
+            } else {
+                manager.addTestProvider(provider, false, false, false, false,
+                        true, true, true, ProviderProperties.POWER_USAGE_LOW, ProviderProperties.ACCURACY_FINE);
+            }
             manager.setTestProviderEnabled(provider, true);
         }
     }

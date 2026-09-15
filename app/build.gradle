@@ -4,15 +4,20 @@ android {
     compileSdk 36
     defaultConfig {
         applicationId 'dev.routemock.app'
-        minSdk 35
+        minSdk 28
         targetSdk 36
-        versionCode providers.gradleProperty('releaseVersionCode').map { it.toInteger() }.getOrElse(1)
-        versionName providers.gradleProperty('releaseVersionName').getOrElse('0.1.0')
+        versionCode providers.gradleProperty('releaseVersionCode').map { it.toInteger() }.getOrElse(1002)
+        versionName providers.gradleProperty('releaseVersionName').getOrElse('0.1.1')
     }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
     lint { abortOnError true }
 }
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation project(':core')
     implementation 'com.google.android.gms:play-services-location:21.3.0'
 }

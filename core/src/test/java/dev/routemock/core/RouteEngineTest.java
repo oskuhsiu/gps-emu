@@ -44,6 +44,60 @@ public class RouteEngineTest {
         assertEquals(30, engine.sample(seconds(210)).traveledMeters(), 1e-9);
     }
 
+    @Test public void stopFreezesLastSampleAcrossDelayedTicks() {
+        var engine = straight(3.6);
+        var last = engine.sample(seconds(10));
+        engine.stop();
+        var stopped = engine.sample(seconds(100));
+        assertStoppedAt(last, stopped);
+        assertEquals(stopped, engine.sample(seconds(1000)));
+    }
+
+    @Test public void stopAfterPauseCannotBeRestartedByCommands() {
+        var engine = straight(3.6);
+        engine.pause(seconds(10));
+        var last = engine.sample(seconds(100));
+        engine.stop();
+        var stopped = engine.sample(seconds(200));
+        assertStoppedAt(last, stopped);
+        engine.stop();
+        engine.setSpeedKmh(30, seconds(300));
+        engine.pause(seconds(400));
+        engine.resume(seconds(500));
+        assertEquals(stopped, engine.sample(seconds(1000)));
+    }
+
+    @Test public void stopAtArrivalPreservesExactEndpoint() {
+        var engine = new RouteEngine(List.of(ORIGIN, new GeoPoint(0, 0.001)), 3.6, 0);
+        var arrived = engine.sample(seconds(1000));
+        assertEquals(RouteEngine.Phase.ARRIVED, arrived.phase());
+        engine.stop();
+        assertStoppedAt(arrived, engine.sample(seconds(2000)));
+    }
+
+    @Test public void stopSingleAndRepeatedCoordinatesPreservesHoldingPoint() {
+        for (var route : List.of(List.of(ORIGIN), List.of(ORIGIN, ORIGIN, ORIGIN),
+                List.of(new GeoPoint(0, 180), new GeoPoint(0, -180)))) {
+            var engine = new RouteEngine(route, 5, 0);
+            var holding = engine.sample(seconds(10));
+            engine.stop();
+            var stopped = engine.sample(seconds(100));
+            assertStoppedAt(holding, stopped);
+            engine.stop();
+            engine.resume(seconds(200));
+            engine.setSpeedKmh(30, seconds(300));
+            assertEquals(stopped, engine.sample(seconds(1000)));
+        }
+    }
+
+    private static void assertStoppedAt(RouteEngine.Sample previous, RouteEngine.Sample stopped) {
+        assertEquals(RouteEngine.Phase.STOPPED, stopped.phase());
+        assertEquals(previous.point(), stopped.point());
+        assertEquals(previous.traveledMeters(), stopped.traveledMeters(), 0);
+        assertEquals(previous.totalMeters(), stopped.totalMeters(), 0);
+        assertEquals(0, stopped.speedMps(), 0);
+    }
+
     @Test public void delayedTickCrossesCornersAndStopsExactlyAtEndpoint() {
         GeoPoint corner = new GeoPoint(0, 0.001), end = new GeoPoint(0.001, 0.001);
         var engine = new RouteEngine(List.of(ORIGIN, corner, end), 3.6, 0);

@@ -6,6 +6,7 @@
 .cxx/
 .externalNativeBuild/
 /captures/
+/test-runs/
 /.runtime/
 /release-assets/
 
@@ -87,16 +88,13 @@ Desktop.ini
 /.codex/
 /.claude/
 
-# GitHub issue #1 is authoritative; these are local drafting/research copies.
-# Keep design, ADRs, research summaries and security reports under version control.
+# Local drafts, investigation history, and generated verification evidence.
+# Keep durable user guidance in docs/faq.md and decisions in docs/adr/.
 /docs/issues/
 /docs/grill.md
-/docs/research/oss-evidence.json
-
-# Raw emulator/device evidence can contain local paths and device metadata.
-# Only these reviewed, compact result summaries are intended for publication.
-/docs/evidence/*
-!/docs/evidence/2026-09-12/
-/docs/evidence/2026-09-12/*
-!/docs/evidence/2026-09-12/artifacts.json
-!/docs/evidence/2026-09-12/receiver-assertions.json
+/docs/design.md
+/docs/verification*.md
+/docs/evidence/
+/docs/research/
+/docs/security/
+.herdr/

@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
 import android.util.Log;
@@ -90,6 +91,11 @@ public final class ProbeActivity extends Activity {
         public void onProviderEnabled(String provider) {
             reportInfo(providerName(provider) + " provider is available");
         }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            // Required by LocationListener before API 30; samples remain the source of truth.
+        }
     };
 
     private final LocationCallback fusedCallback = new LocationCallback() {
@@ -160,9 +166,16 @@ public final class ProbeActivity extends Activity {
         scrollView.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
         scrollView.setOnApplyWindowInsetsListener((view, insets) -> {
-            android.graphics.Insets systemBars = insets.getInsets(WindowInsets.Type.systemBars());
-            int top = systemBars.top;
-            int bottom = systemBars.bottom;
+            int top;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.graphics.Insets systemBars = insets.getInsets(WindowInsets.Type.systemBars());
+                top = systemBars.top;
+                bottom = systemBars.bottom;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
             root.setPadding(dp(20), dp(18) + top, dp(20), dp(24) + bottom);
             return insets;
         });
@@ -410,7 +423,7 @@ public final class ProbeActivity extends Activity {
             record.put("longitude", location.getLongitude());
             record.put("speedMps", location.hasSpeed() ? location.getSpeed() : 0.0);
             record.put("accuracy", location.hasAccuracy() ? location.getAccuracy() : -1.0);
-            record.put("isMock", location.isMock());
+            record.put("isMock", isMock(location));
             record.put("elapsedRealtimeNanos", location.getElapsedRealtimeNanos());
             record.put("wallTimeMs", location.getTime());
             Log.i(TAG, record.toString());
@@ -492,6 +505,13 @@ public final class ProbeActivity extends Activity {
         return result.toString();
     }
 
+    private static boolean isMock(Location location) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return location.isMock();
+        }
+        return location.isFromMockProvider();
+    }
+
     private static String safeProvider(String provider) {
         return provider == null || provider.isEmpty() ? "unknown" : provider;
     }
@@ -553,7 +573,7 @@ public final class ProbeActivity extends Activity {
                     "%s\ncount：%d（樣本數）\nprovider：%s\nlatitude/longitude：%.7f, %.7f\n"
                             + "speedMps：%s\naccuracy：%s\nisMock：%s\nelapsedRealtimeNanos：%d",
                     channel, count, provider, lastLocation.getLatitude(), lastLocation.getLongitude(),
-                    speed, accuracy, lastLocation.isMock(), lastLocation.getElapsedRealtimeNanos());
+                    speed, accuracy, isMock(lastLocation), lastLocation.getElapsedRealtimeNanos());
         }
     }
 }

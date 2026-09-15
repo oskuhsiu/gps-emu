@@ -3,9 +3,11 @@ package dev.routemock.probe;
 import android.app.Activity;
 import android.app.Instrumentation;
 import android.app.UiAutomation;
+import android.accessibilityservice.AccessibilityService;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /**
@@ -35,6 +37,27 @@ public final class UiDriver extends Instrumentation {
         try {
             Bundle arguments = instrumentationArguments;
             String operation = value(arguments, "operation", OPERATION_DUMP);
+            if ("sleep".equals(operation) || "wake".equals(operation)) {
+                UiAutomation automation = getUiAutomation();
+                boolean acted;
+                if ("sleep".equals(operation)) {
+                    acted = automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN);
+                } else {
+                    long now = SystemClock.uptimeMillis();
+                    boolean down = automation.injectInputEvent(new KeyEvent(now, now,
+                            KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_WAKEUP, 0), true);
+                    boolean up = automation.injectInputEvent(new KeyEvent(now, SystemClock.uptimeMillis(),
+                            KeyEvent.ACTION_UP, KeyEvent.KEYCODE_WAKEUP, 0), true);
+                    acted = down && up;
+                }
+                if (acted) {
+                    result.putString("result", "success");
+                    finishSuccess(result);
+                } else {
+                    finishWithError(result, "Global screen action failed: " + operation);
+                }
+                return;
+            }
             AccessibilityNodeInfo root = rootWithShortRetry();
             if (root == null) {
                 finishWithError(result, "Accessibility root was not ready");

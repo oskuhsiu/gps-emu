@@ -13,6 +13,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.LocationManager;
 import android.os.IBinder;
+import android.os.Build;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemClock;
@@ -26,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 /** All engine and sink transitions run on one worker, including Stop and asynchronous GMS waits. */
 public final class MockLocationService extends Service {
     public static final String START = "dev.routemock.START", HOLD = "dev.routemock.HOLD",
-            STOP = "dev.routemock.STOP", PAUSE = "dev.routemock.PAUSE",
+            STOP = "dev.routemock.STOP", RELEASE = "dev.routemock.RELEASE", PAUSE = "dev.routemock.PAUSE",
             RESUME = "dev.routemock.RESUME", SPEED = "dev.routemock.SPEED",
             CLEANUP = "dev.routemock.CLEANUP";
     public record Status(String phase, String message, RouteEngine.Sample sample,
@@ -49,9 +50,11 @@ public final class MockLocationService extends Service {
     public static boolean hasPendingCleanup(Context context) { return MockSink.hasPending(context); }
     public static boolean isSelectedMockApp(Context context) {
         try {
-            return context.getSystemService(AppOpsManager.class).unsafeCheckOpNoThrow(
-                    AppOpsManager.OPSTR_MOCK_LOCATION, Process.myUid(), context.getPackageName())
-                    == AppOpsManager.MODE_ALLOWED;
+            AppOpsManager ops = context.getSystemService(AppOpsManager.class);
+            int mode = Build.VERSION.SDK_INT >= 29
+                    ? ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, Process.myUid(), context.getPackageName())
+                    : ops.checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, Process.myUid(), context.getPackageName());
+            return mode == AppOpsManager.MODE_ALLOWED;
         } catch (RuntimeException e) { return false; }
     }
 
@@ -66,11 +69,11 @@ public final class MockLocationService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        String action = intent == null ? STOP : intent.getAction();
+        String action = intent == null ? RELEASE : intent.getAction();
         boolean mustForeground = START.equals(action) || HOLD.equals(action) || CLEANUP.equals(action);
         if (mustForeground && !foreground) {
             try {
-                startForeground(NOTIFICATION, notification("正在準備模擬位置"), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+                startLocationForeground(CLEANUP.equals(action));
                 foreground = true;
             } catch (RuntimeException e) {
                 status = new Status("ERROR", "無法啟動前景定位：" + detail(e), null,
@@ -87,15 +90,24 @@ public final class MockLocationService extends Service {
         return START_NOT_STICKY;
     }
 
+    private void startLocationForeground(boolean cleanup) {
+        Notification notification = notification(cleanup ? "正在清理模擬位置" : "正在準備模擬位置", false, !cleanup);
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        } else {
+            startForeground(NOTIFICATION, notification);
+        }
+    }
+
     private void command(String action, double speed) {
         if (destroyed) return;
-        if (STOP.equals(action) || CLEANUP.equals(action)) { stopSession("已停止；接收 App 仍需等待新的真實定位", false); return; }
+        if (RELEASE.equals(action) || CLEANUP.equals(action)) { stopSession("模擬定位已關閉；接收 App 仍需等待新的真實定位", false); return; }
         if (stopping) return;
         try {
             if (START.equals(action) || HOLD.equals(action)) {
                 if (engine != null) return;
                 if (!foreground) {
-                    startForeground(NOTIFICATION, notification("正在準備模擬位置"), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+                    startLocationForeground(false);
                     foreground = true;
                 }
                 if (hasPendingCleanup(this)) throw new IllegalStateException("上次模擬尚未清理，請先清理");
@@ -115,7 +127,8 @@ public final class MockLocationService extends Service {
                     ticker = worker.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
             } else if (engine != null) {
                 long now = SystemClock.elapsedRealtimeNanos();
-                if (PAUSE.equals(action)) engine.pause(now);
+                if (STOP.equals(action)) engine.stop();
+                else if (PAUSE.equals(action)) engine.pause(now);
                 else if (RESUME.equals(action)) engine.resume(now);
                 else if (SPEED.equals(action)) engine.setSpeedKmh(speed, now);
                 tick();
@@ -143,10 +156,12 @@ public final class MockLocationService extends Service {
                 case PAUSED -> "已暫停，持續定點";
                 case HOLDING -> "定點模擬中";
                 case ARRIVED -> "已到達，持續定點";
+                case STOPPED -> "已停止行走 · 維持定點";
             };
             if (sink.platformOnly()) message += "（僅 Android 定位；Google 服務不可用）";
             status = new Status(sample.phase().name(), message, sample, true, false, sink.platformOnly());
-            getSystemService(NotificationManager.class).notify(NOTIFICATION, notification(message));
+            getSystemService(NotificationManager.class).notify(NOTIFICATION, notification(message, sample.phase() == RouteEngine.Phase.MOVING
+                    || sample.phase() == RouteEngine.Phase.PAUSED, true));
         } catch (Exception e) { stopSession(detail(e), true); }
     }
 
@@ -162,6 +177,8 @@ public final class MockLocationService extends Service {
     private void cleanup() {
         status = new Status("STOPPING", "正在清理模擬位置", status.sample(), true,
                 hasPendingCleanup(this), sink.platformOnly());
+        if (foreground) getSystemService(NotificationManager.class).notify(NOTIFICATION,
+                notification("正在清理模擬位置", false, false));
         try { sink.cleanup(); }
         catch (Exception e) {
             if (sink.hasInFlight()) {
@@ -189,17 +206,26 @@ public final class MockLocationService extends Service {
         if (destroyed) worker.shutdown();
     }
 
-    private Notification notification(String text) {
+    private Notification notification(String text, boolean canStop, boolean canRelease) {
         PendingIntent launch = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class)
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        PendingIntent stop = PendingIntent.getService(this, 1,
-                new Intent(this, MockLocationService.class).setAction(STOP),
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_location)
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_location)
                 .setContentTitle("Route Mock").setContentText(text).setContentIntent(launch)
-                .setOngoing(true).setOnlyAlertOnce(true)
-                .addAction(new Notification.Action.Builder(null, "停止", stop).build()).build();
+                .setOngoing(true).setOnlyAlertOnce(true);
+        if (canStop) {
+            PendingIntent stop = PendingIntent.getService(this, 1,
+                    new Intent(this, MockLocationService.class).setAction(STOP),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(new Notification.Action.Builder(null, "停止行走", stop).build());
+        }
+        if (canRelease) {
+            PendingIntent release = PendingIntent.getService(this, 2,
+                    new Intent(this, MockLocationService.class).setAction(RELEASE),
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            builder.addAction(new Notification.Action.Builder(null, "恢復真實定位", release).build());
+        }
+        return builder.build();
     }
 
     private static String detail(Exception e) {

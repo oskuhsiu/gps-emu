@@ -13,7 +13,7 @@ public final class RouteEngine {
     public static final int MAX_POINTS = 10_000;
     private static final double EARTH_RADIUS_METERS = 6_371_008.8;
 
-    public enum Phase { MOVING, PAUSED, HOLDING, ARRIVED }
+    public enum Phase { MOVING, PAUSED, HOLDING, ARRIVED, STOPPED }
     public record Sample(GeoPoint point, double speedMps, float bearingDegrees,
                          double traveledMeters, double totalMeters, Phase phase) {}
 
@@ -49,8 +49,8 @@ public final class RouteEngine {
 
     public Sample sample(long nowNanos) {
         advance(nowNanos);
-        if (phase == Phase.HOLDING) return new Sample(points.get(0), 0, 0, 0, 0, phase);
-        if (phase == Phase.ARRIVED) {
+        if (totalMeters == 0) return new Sample(points.get(0), 0, 0, 0, 0, phase);
+        if (traveledMeters >= totalMeters) {
             return new Sample(points.get(points.size() - 1), 0, 0, totalMeters, totalMeters, phase);
         }
         double remaining = traveledMeters;
@@ -80,6 +80,11 @@ public final class RouteEngine {
     public void resume(long nowNanos) {
         advance(nowNanos);
         if (phase == Phase.PAUSED) phase = Phase.MOVING;
+    }
+
+    /** Freeze current progress without advancing through time since the last sample or command. */
+    public void stop() {
+        phase = Phase.STOPPED;
     }
 
     private void advance(long nowNanos) {
